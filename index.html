@@ -36,6 +36,7 @@ const CATEGORY_COLORS = {
   "Azionari paesi emergenti":     "#D4537E",
   "Azionari nord america":        "#6399BB",
   "assicurativo":                 "#888780",
+  "Monetario":                    "#A0A0B0",
 };
 
 const BENCHMARK = {
@@ -94,8 +95,35 @@ const MEDIOLANUM_DATA = [
   { nome: "Polizza Mediolanum Intelligent Life Plan",                  isin: null,           quantita: 1,       prezzoCarico: 35000,  controvaloreAttuale: 43598.50, categoria: "assicurativo",                banca: "MD", plusMinus: 8619.11,  rendimentoAnnuo: 11.748 },
 ];
 
+const BPER_DATA = [
+  { nome: "Arca R Val Re 27 2 R",    isin: "IT0005483430", quantita: 5999.300, prezzoCarico: 5.000,   controvaloreAttuale: 36835.70, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Arca Ri Div Bond P",       isin: "IT0000380029", quantita: 2137.921, prezzoCarico: 11.286,  controvaloreAttuale: 27361.11, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Arca Te",                  isin: "IT0000384641", quantita: 996.922,  prezzoCarico: 23.680,  controvaloreAttuale: 26493.20, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Arca Val Re 27 3 R",       isin: "IT0005494643", quantita: 3999.300, prezzoCarico: 5.000,   controvaloreAttuale: 25579.52, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Bper GI Cv Bond",          isin: "LU0079194363", quantita: 66.871,   prezzoCarico: 199.020, controvaloreAttuale: 18348.06, categoria: "Obbligazionario Convertibili", banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Bper Global Bond",         isin: "LU0087341626", quantita: 38.209,   prezzoCarico: 169.102, controvaloreAttuale: 6403.45,  categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Etica Bilanciato P",       isin: "IT0003409213", quantita: 1296.056, prezzoCarico: 13.513,  controvaloreAttuale: 20371.41, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Etica Red Bill Crd P",     isin: "IT0005117558", quantita: 4425.670, prezzoCarico: 4.958,   controvaloreAttuale: 21203.38, categoria: "Obbligazioni paesi emergenti", banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Arca Bb",                  isin: "IT0000380003", quantita: 293.76,   prezzoCarico: 51.403,  controvaloreAttuale: 12163.54, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Arca Bond Corp",           isin: "IT0003021990", quantita: 80.350,   prezzoCarico: 9.889,   controvaloreAttuale: 2446.12,  categoria: "Obbligazioni High Yield",      banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Arca Bond P Emerg P",      isin: "IT0001248373", quantita: 20.008,   prezzoCarico: 18.098,  controvaloreAttuale: 1607.64,  categoria: "Obbligazioni paesi emergenti", banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Arca Ced Att 26 R",        isin: "IT0005494601", quantita: 4999.300, prezzoCarico: 5.203,   controvaloreAttuale: 26061.36, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Arca Dinamico P",          isin: "IT0003995239", quantita: 1336.451, prezzoCarico: 9.143,   controvaloreAttuale: 12219.17, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Arca Equilibrio P",        isin: "IT0003956197", quantita: 1921.234, prezzoCarico: 7.365,   controvaloreAttuale: 14149.89, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Arca Ft Ced Pl 30 3R",     isin: "IT0005635294", quantita: 3997.65,  prezzoCarico: 5.011,   controvaloreAttuale: 20040.49, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Arca Obl Europa",          isin: "IT0000124824", quantita: 1911.765, prezzoCarico: 13.420,  controvaloreAttuale: 25655.89, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Arca Oft Uso 30 R",        isin: "IT0005653237", quantita: 1999.300, prezzoCarico: 5.126,   controvaloreAttuale: 10248.41, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Arca Oxy Plus 50 Acc",     isin: "IT0005106718", quantita: 1642.763, prezzoCarico: 6.794,   controvaloreAttuale: 11160.93, categoria: "Azionari internazionali",      banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+  { nome: "Conto Corrente BPER",      isin: null,           quantita: 1,        prezzoCarico: null,    controvaloreAttuale: 7746.51,  categoria: "Monetario",                   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
+];
+
+const PI_DATA = [
+  { nome: "Poste Domani Per Te Plus",      isin: null, quantita: 1, prezzoCarico: null, controvaloreAttuale: 20587.73, categoria: "assicurativo", banca: "PI", plusMinus: null, rendimentoAnnuo: 0.77 },
+  { nome: "Poste Progetto Dinamico Bonus", isin: null, quantita: 1, prezzoCarico: null, controvaloreAttuale: 33402.21, categoria: "assicurativo", banca: "PI", plusMinus: null, rendimentoAnnuo: 2.64 },
+  { nome: "Libretto Smart Poste",          isin: null, quantita: 1, prezzoCarico: null, controvaloreAttuale: 2335.65,  categoria: "Monetario",    banca: "PI", plusMinus: null, rendimentoAnnuo: null },
+];
+
 const fmt = (n, dec = 2) => {
-  if (n === null || n === undefined || isNaN(n)) return "—";
   return new Intl.NumberFormat("it-IT", { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(n);
 };
 const fmtEur = (n) => {
@@ -125,16 +153,22 @@ const extractJSON = (text) => {
 };
 
 const callClaude = async (system, userPrompt, maxTokens = 2000) => {
-  const body = { model: "claude-sonnet-4-20250514", max_tokens: maxTokens, messages: [{ role: "user", content: userPrompt }] };
-  if (system) body.system = system;
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+  const key = window._claudeApiKey || "";
+  if (!key) throw new Error("API Key non inserita — inseriscila in cima alla pagina");
+  const prompt = system ? `${system}\n\n${userPrompt}` : userPrompt;
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 },
+    }),
   });
   const data = await resp.json();
   if (data.error) throw new Error(data.error.message);
-  return (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("Risposta vuota da Gemini");
+  return text;
 };
 
 async function fetchYahoo(ticker) {
@@ -538,7 +572,7 @@ function AnalisiTab({ allHoldings, totalValue, byCat, catData }) {
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:analysis?"1rem":0 }}>
           <div>
             <div style={{ fontWeight:500, fontSize:15 }}>Analisi AI</div>
-            <div style={{ fontSize:12, color:"#888" }}>powered by Claude</div>
+            <div style={{ fontSize:12, color:"#888" }}>powered by Gemini</div>
           </div>
           <button onClick={run} disabled={loading} style={{ padding:"8px 16px", borderRadius:8, border:"0.5px solid #444", background:"#2a2a3e", color:"white", cursor:loading?"not-allowed":"pointer", fontSize:13, fontWeight:500 }}>
             {loading?"Analisi in corso…":done?"Rigenera":"Avvia analisi"}
@@ -806,16 +840,37 @@ function AzioniTab({ allHoldings, totalValue, byCat }) {
 }
 
 function App() {
-  const [bankData, setBankData] = useState({ MD: MEDIOLANUM_DATA });
+  const [bankData, setBankData] = useState({ MD: MEDIOLANUM_DATA, BPER: BPER_DATA, PI: PI_DATA });
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sortCol, setSortCol] = useState("controvaloreAttuale");
   const [sortDir, setSortDir] = useState("desc");
   const [filterBank, setFilterBank] = useState("all");
   const [filterCat, setFilterCat] = useState("all");
   const [search, setSearch] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [filterBankAI, setFilterBankAI] = useState("all");
+
+  // Aggiungi C/C Mediolanum se non presente
+  React.useEffect(() => {
+    setBankData(prev => {
+      const md = prev.MD || [];
+      if (!md.find(h => h.nome === "Conto Corrente Mediolanum")) {
+        return { ...prev, MD: [...md, { nome: "Conto Corrente Mediolanum", isin: null, quantita: 1, prezzoCarico: null, controvaloreAttuale: 5790, categoria: "Monetario", banca: "MD", plusMinus: null, rendimentoAnnuo: null }] };
+      }
+      return prev;
+    });
+  }, []);
 
   const allHoldings = Object.values(bankData).flat();
   const liveData = useLivePrices(allHoldings);
+
+  // Holdings filtrati per AI (banca selezionata)
+  const aiHoldings = filterBankAI === "all" ? allHoldings : allHoldings.filter(h => h.banca === filterBankAI);
+  const aiTotalValue = aiHoldings.reduce((s,h) => s + (h.controvaloreAttuale||0), 0);
+  const aiByCat = {};
+  aiHoldings.forEach(h => { if(h.controvaloreAttuale) aiByCat[h.categoria] = (aiByCat[h.categoria]||0) + h.controvaloreAttuale; });
+  const aiCatData = Object.entries(aiByCat).map(([label,value]) => ({ label, value, color: CATEGORY_COLORS[label]||"#888" })).sort((a,b) => b.value - a.value);
 
   const totalValue    = allHoldings.reduce((s,h)=>s+(h.controvaloreAttuale||0),0);
   const totalPL       = allHoldings.reduce((s,h)=>s+(h.plusMinus||0),0);
@@ -848,9 +903,29 @@ function App() {
 
   const TABS=["dashboard","titoli","analisi","previsioni","azioni"];
 
+  // Filtro banca AI toolbar
+  const AIBankFilter = () => (
+    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:"1.25rem", flexWrap:"wrap" }}>
+      <span style={{ fontSize:13, color:"#888" }}>Analizza:</span>
+      {["all", ...Object.keys(BANKS)].map(code => (
+        <button key={code} onClick={() => setFilterBankAI(code)} style={{
+          padding:"5px 12px", borderRadius:20, fontSize:12, cursor:"pointer",
+          border: filterBankAI===code ? `1px solid ${code==="all"?"#888":BANKS[code]?.color}` : "0.5px solid #333",
+          background: filterBankAI===code ? (code==="all"?"#2a2a3e":`${BANKS[code]?.color}20`) : "transparent",
+          color: code==="all" ? "white" : BANKS[code]?.color ?? "white",
+          fontWeight: filterBankAI===code ? 500 : 400,
+        }}>
+          {code==="all" ? `Tutto (${fmtEur(totalValue)})` : `${BANKS[code].name} (${fmtEur(byBank.find(b=>b.code===code)?.value??0)})`}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div style={{ fontFamily:"system-ui,sans-serif", background:"#12121e", color:"white", minHeight:"100vh", padding:"1rem" }}>
       <div style={{ maxWidth:920, margin:"0 auto" }}>
+
+        {/* Header */}
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"1.5rem", flexWrap:"wrap", gap:10 }}>
           <div>
             <h1 style={{ margin:0, fontSize:22, fontWeight:500 }}>Portfolio Analyzer</h1>
@@ -868,18 +943,50 @@ function App() {
             ))}
           </div>
         </div>
+
+        {/* API Key field */}
+        <div style={{ background:"#1e2235", borderRadius:10, padding:"10px 14px", marginBottom:"1.25rem", display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+          <span style={{ fontSize:12, color:"#888", flexShrink:0 }}>🔑 API Key Google:</span>
+          <input
+            type={showApiKey ? "text" : "password"}
+            value={apiKey}
+            onChange={e => { setApiKey(e.target.value); window._claudeApiKey = e.target.value; }}
+            placeholder="AIzaSy..."
+            style={{ flex:1, minWidth:200, padding:"5px 10px", borderRadius:6, border:"0.5px solid #444", background:"#12121e", color:"white", fontSize:12, fontFamily:"monospace" }}
+          />
+          <button onClick={() => setShowApiKey(s=>!s)} style={{ padding:"5px 10px", borderRadius:6, border:"0.5px solid #444", background:"transparent", color:"#888", cursor:"pointer", fontSize:12 }}>
+            {showApiKey ? "Nascondi" : "Mostra"}
+          </button>
+          {apiKey && <span style={{ fontSize:11, color:"#1D9E75" }}>✓ Key impostata</span>}
+          {!apiKey && <span style={{ fontSize:11, color:"#888", fontStyle:"italic" }}>Necessaria per Analisi, Previsioni e Azioni</span>}
+        </div>
+
+        {/* Upload banche */}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:"1.25rem" }}>
           {Object.keys(BANKS).map(code=>(
             <UploadZone key={code} bankCode={code} hasData={!!(bankData[code]?.length)}
               onData={data=>setBankData(prev=>({...prev,[code]:data}))} />
           ))}
         </div>
+
+        {/* Totali per banca */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:"1.25rem" }}>
+          {byBank.map(b => (
+            <div key={b.code} style={{ background:"#1e2235", borderRadius:10, padding:"12px 16px", borderLeft:`3px solid ${b.color}` }}>
+              <div style={{ fontSize:12, color:"#888", marginBottom:3 }}>{b.name}</div>
+              <div style={{ fontSize:18, fontWeight:500, color:b.color }}>{fmtEur(b.value)}</div>
+              <div style={{ fontSize:11, color:"#888", marginTop:2 }}>{totalValue>0?Math.round(b.value/totalValue*100):"—"}% del totale</div>
+            </div>
+          ))}
+        </div>
+
         <LiveBanner liveData={liveData} baseTotal={totalValue} />
+
         {activeTab==="dashboard"&&<DashboardTab allHoldings={allHoldings} totalValue={totalValue} totalPL={totalPL} totalPLpct={totalPLpct} byBank={byBank} catData={catData} liveData={liveData}/>}
         {activeTab==="titoli"&&<TitoliTab filteredHoldings={filteredHoldings} sortCol={sortCol} sortDir={sortDir} handleSort={handleSort} filterBank={filterBank} setFilterBank={setFilterBank} filterCat={filterCat} setFilterCat={setFilterCat} search={search} setSearch={setSearch} categories={categories} liveData={liveData} totalValue={totalValue}/>}
-        {activeTab==="analisi"&&<AnalisiTab allHoldings={allHoldings} totalValue={totalValue} byCat={byCat} catData={catData}/>}
-        {activeTab==="previsioni"&&<PrevisioniTab allHoldings={allHoldings} totalValue={totalValue}/>}
-        {activeTab==="azioni"&&<AzioniTab allHoldings={allHoldings} totalValue={totalValue} byCat={byCat}/>}
+        {activeTab==="analisi"&&<><AIBankFilter/><AnalisiTab allHoldings={aiHoldings} totalValue={aiTotalValue} byCat={aiByCat} catData={aiCatData}/></>}
+        {activeTab==="previsioni"&&<><AIBankFilter/><PrevisioniTab allHoldings={aiHoldings} totalValue={aiTotalValue}/></>}
+        {activeTab==="azioni"&&<><AIBankFilter/><AzioniTab allHoldings={aiHoldings} totalValue={aiTotalValue} byCat={aiByCat}/></>}
       </div>
     </div>
   );
