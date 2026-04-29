@@ -12,6 +12,13 @@
   body { background: #12121e; color: white; font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; }
   input, select, button { font-family: inherit; }
   table { border-collapse: collapse; }
+  @media (max-width: 600px) {
+    .grid-3 { grid-template-columns: 1fr 1fr !important; }
+    .grid-2 { grid-template-columns: 1fr !important; }
+    .bank-totals { grid-template-columns: 1fr !important; }
+    h1 { font-size: 18px !important; }
+    .tab-btn { padding: 5px 10px !important; font-size: 12px !important; }
+  }
 </style>
 </head>
 <body>
@@ -363,7 +370,7 @@ function DashboardTab({ allHoldings, totalValue, totalPL, totalPLpct, byBank, ca
   const { lastUpdate, totalStimato } = liveData;
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: "1.25rem" }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:"1.25rem" }}>
         {[
           {
             label: lastUpdate ? "Stima oggi" : `Valore al ${DATA_RIF}`,
@@ -377,14 +384,14 @@ function DashboardTab({ allHoldings, totalValue, totalPL, totalPLpct, byBank, ca
           { label: "Plus/Minus da acquisto", value: fmtEur(totalPL), sub: totalPLpct !== null ? fmtPct(totalPLpct) : "P&L parziale", color: totalPL >= 0 ? "#1D9E75" : "#D85A30" },
           { label: "Banche attive", value: byBank.length.toString(), sub: byBank.map(b => b.code).join(", ") },
         ].map((c, i) => (
-          <div key={i} style={{ background: "#1e2235", borderRadius: 10, padding: "14px 16px" }}>
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>{c.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: c.color ?? "white" }}>{c.value}</div>
-            <div style={{ fontSize: 12, color: "#888", marginTop: 3 }}>{c.sub}</div>
+          <div key={i} style={{ background: "#1e2235", borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>{c.label}</div>
+            <div style={{ fontSize: 18, fontWeight: 500, color: c.color ?? "white" }}>{c.value}</div>
+            <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>{c.sub}</div>
           </div>
         ))}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: "1.25rem" }}>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:"1.25rem" }}>
         {[
           { title: "Per banca", data: byBank.map(b => ({ value: b.value, color: b.color, label: b.name })) },
           { title: "Asset allocation", data: catData.map(c => ({ value: c.value, color: c.color, label: c.label })) },
@@ -432,83 +439,162 @@ function DashboardTab({ allHoldings, totalValue, totalPL, totalPLpct, byBank, ca
 }
 
 function TitoliTab({ filteredHoldings, sortCol, sortDir, handleSort, filterBank, setFilterBank, filterCat, setFilterCat, search, setSearch, categories, liveData, totalValue }) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  React.useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+
   const SortIcon = ({ col }) => (
     <span style={{ opacity: sortCol===col?1:0.3, fontSize:10, marginLeft:3 }}>
       {sortCol===col?(sortDir==="asc"?"↑":"↓"):"↕"}
     </span>
   );
+
+  const totalCV = filteredHoldings.reduce((s,h)=>s+(h.controvaloreAttuale||0),0);
+  const totalPL = filteredHoldings.reduce((s,h)=>s+(h.plusMinus||0),0);
+
   return (
     <div>
+      {/* Filtri */}
       <div style={{ display:"flex", gap:10, marginBottom:"1rem", flexWrap:"wrap" }}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cerca titolo…"
-          style={{ flex:1, minWidth:160, padding:"6px 10px", borderRadius:8, border:"0.5px solid #444", background:"#1e2235", color:"white", fontSize:13 }} />
+          style={{ flex:1, minWidth:140, padding:"8px 10px", borderRadius:8, border:"0.5px solid #444", background:"#1e2235", color:"white", fontSize:13 }} />
         <select value={filterBank} onChange={e=>setFilterBank(e.target.value)}
-          style={{ padding:"6px 10px", borderRadius:8, border:"0.5px solid #444", background:"#1e2235", color:"white", fontSize:13 }}>
+          style={{ padding:"8px 10px", borderRadius:8, border:"0.5px solid #444", background:"#1e2235", color:"white", fontSize:13 }}>
           <option value="all">Tutte le banche</option>
           {Object.entries(BANKS).map(([k,v]) => <option key={k} value={k}>{v.name}</option>)}
         </select>
         <select value={filterCat} onChange={e=>setFilterCat(e.target.value)}
-          style={{ padding:"6px 10px", borderRadius:8, border:"0.5px solid #444", background:"#1e2235", color:"white", fontSize:13 }}>
+          style={{ padding:"8px 10px", borderRadius:8, border:"0.5px solid #444", background:"#1e2235", color:"white", fontSize:13 }}>
           <option value="all">Tutte le categorie</option>
           {categories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
-      <div style={{ overflowX:"auto" }}>
-        <table style={{ width:"100%", fontSize:12.5 }}>
-          <thead><tr style={{ borderBottom:"0.5px solid #333" }}>
-            {[{l:"Titolo",c:"nome"},{l:"Banca",c:"banca"},{l:"Categoria",c:"categoria"},
-              {l:"Quote",c:"quantita"},{l:"P.Carico",c:"prezzoCarico"},
-              {l:"Controvalore",c:"controvaloreAttuale"},{l:"Stima oggi ⚠",c:"stimato"},
-              {l:"P&L €",c:"plusMinus"},{l:"Rend.%",c:"rendimentoAnnuo"}
-            ].map(({l,c}) => (
-              <th key={c} onClick={()=>c!=="stimato"&&handleSort(c)}
-                style={{ textAlign:["nome","banca","categoria"].includes(c)?"left":"right",
-                  padding:"7px 8px", color:c==="stimato"?"#EF9F27":"#888",
-                  fontWeight:500, cursor:c!=="stimato"?"pointer":"default", whiteSpace:"nowrap" }}>
-                {l}{c!=="stimato"&&<SortIcon col={c} />}
-              </th>
-            ))}
-          </tr></thead>
-          <tbody>
-            {filteredHoldings.map((h,i) => {
-              const e = liveData.enriched.find(x=>x.nome===h.nome);
-              return (
-                <tr key={i} style={{ borderBottom:"0.5px solid #222" }}>
-                  <td style={{ padding:"7px 8px", maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }} title={h.nome}>{h.nome}</td>
-                  <td style={{ padding:"7px 8px" }}>
-                    <span style={{ padding:"2px 6px", borderRadius:4, fontSize:11, background:`${BANKS[h.banca]?.color}25`, color:BANKS[h.banca]?.color, fontWeight:500 }}>{h.banca}</span>
-                  </td>
-                  <td style={{ padding:"7px 8px", color:"#888", fontSize:11 }}>{h.categoria}</td>
-                  <td style={{ padding:"7px 8px", textAlign:"right" }}>{h.quantita!=null?fmt(h.quantita):"—"}</td>
-                  <td style={{ padding:"7px 8px", textAlign:"right" }}>{h.prezzoCarico!=null?fmt(h.prezzoCarico,3):"—"}</td>
-                  <td style={{ padding:"7px 8px", textAlign:"right", fontWeight:500 }}>{fmtEur(h.controvaloreAttuale)}</td>
-                  <td style={{ padding:"7px 8px", textAlign:"right" }}>
-                    {e?.stimato!=null?(
-                      <span>
-                        <span style={{ fontWeight:500, color:e.stimato>=h.controvaloreAttuale?"#1D9E75":"#D85A30" }}>{fmtEur(e.stimato)}</span>
-                        <span style={{ fontSize:10, color:"#888", marginLeft:3 }}>({e.varPct>=0?"+":""}{fmt(e.varPct)}%)</span>
-                      </span>
-                    ):<span style={{ color:"#555" }}>{liveData.lastUpdate?"n/d":"—"}</span>}
-                  </td>
-                  <td style={{ padding:"7px 8px", textAlign:"right", color:h.plusMinus>0?"#1D9E75":h.plusMinus<0?"#D85A30":"#888" }}>{fmtEur(h.plusMinus)}</td>
-                  <td style={{ padding:"7px 8px", textAlign:"right", color:h.rendimentoAnnuo>0?"#1D9E75":h.rendimentoAnnuo<0?"#D85A30":"#888" }}>{fmtPct(h.rendimentoAnnuo)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot><tr style={{ borderTop:"0.5px solid #333", fontWeight:500 }}>
-            <td colSpan={5} style={{ padding:"7px 8px", color:"#888", fontSize:12 }}>{filteredHoldings.length} titoli</td>
-            <td style={{ padding:"7px 8px", textAlign:"right" }}>{fmtEur(filteredHoldings.reduce((s,h)=>s+(h.controvaloreAttuale||0),0))}</td>
-            <td style={{ padding:"7px 8px", textAlign:"right", color:"#EF9F27", fontSize:12 }}>
-              {liveData.lastUpdate?fmtEur(filteredHoldings.reduce((s,h)=>{const e=liveData.enriched.find(x=>x.nome===h.nome);return s+(e?.stimato??h.controvaloreAttuale??0);},0)):"—"}
-            </td>
-            <td style={{ padding:"7px 8px", textAlign:"right", color:filteredHoldings.reduce((s,h)=>s+(h.plusMinus||0),0)>=0?"#1D9E75":"#D85A30" }}>
-              {fmtEur(filteredHoldings.reduce((s,h)=>s+(h.plusMinus||0),0))}
-            </td>
-            <td/>
-          </tr></tfoot>
-        </table>
+
+      {/* Riepilogo totali */}
+      <div style={{ display:"flex", gap:12, marginBottom:"1rem", flexWrap:"wrap" }}>
+        <div style={{ fontSize:13, color:"#888" }}>{filteredHoldings.length} titoli</div>
+        <div style={{ fontSize:13, fontWeight:500 }}>{fmtEur(totalCV)}</div>
+        {totalPL !== 0 && <div style={{ fontSize:13, color:totalPL>=0?"#1D9E75":"#D85A30" }}>{totalPL>=0?"+":""}{fmtEur(totalPL)}</div>}
       </div>
+
+      {/* MOBILE: card verticali */}
+      {isMobile ? (
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          {filteredHoldings.map((h,i) => {
+            const e = liveData.enriched.find(x=>x.nome===h.nome);
+            const bank = BANKS[h.banca];
+            return (
+              <div key={i} style={{ background:"#1e2235", borderRadius:10, padding:"14px", borderLeft:`3px solid ${bank?.color||"#444"}` }}>
+                {/* Nome + banca */}
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+                  <div style={{ fontSize:14, fontWeight:500, flex:1, marginRight:8, lineHeight:1.4 }}>{h.nome}</div>
+                  <span style={{ padding:"2px 8px", borderRadius:4, fontSize:11, background:`${bank?.color}25`, color:bank?.color, fontWeight:500, flexShrink:0 }}>{h.banca}</span>
+                </div>
+                {/* Categoria */}
+                <div style={{ fontSize:12, color:"#888", marginBottom:12 }}>{h.categoria}</div>
+                {/* Valori in griglia 2 colonne */}
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px 16px" }}>
+                  <div>
+                    <div style={{ fontSize:11, color:"#888", marginBottom:2 }}>Controvalore</div>
+                    <div style={{ fontSize:15, fontWeight:500 }}>{fmtEur(h.controvaloreAttuale)}</div>
+                  </div>
+                  {e?.stimato!=null && (
+                    <div>
+                      <div style={{ fontSize:11, color:"#EF9F27", marginBottom:2 }}>Stima oggi ⚠</div>
+                      <div style={{ fontSize:15, fontWeight:500, color:e.stimato>=h.controvaloreAttuale?"#1D9E75":"#D85A30" }}>
+                        {fmtEur(e.stimato)}
+                        <span style={{ fontSize:11, color:"#888", marginLeft:4 }}>({e.varPct>=0?"+":""}{fmt(e.varPct)}%)</span>
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <div style={{ fontSize:11, color:"#888", marginBottom:2 }}>P&L</div>
+                    <div style={{ fontSize:14, color:h.plusMinus>0?"#1D9E75":h.plusMinus<0?"#D85A30":"#888" }}>{fmtEur(h.plusMinus)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:11, color:"#888", marginBottom:2 }}>Rend. annuo</div>
+                    <div style={{ fontSize:14, color:h.rendimentoAnnuo>0?"#1D9E75":h.rendimentoAnnuo<0?"#D85A30":"#888" }}>{fmtPct(h.rendimentoAnnuo)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:11, color:"#888", marginBottom:2 }}>Quote</div>
+                    <div style={{ fontSize:13 }}>{h.quantita!=null?fmt(h.quantita):"—"}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:11, color:"#888", marginBottom:2 }}>Prezzo carico</div>
+                    <div style={{ fontSize:13 }}>{h.prezzoCarico!=null?fmt(h.prezzoCarico,3):"—"}</div>
+                  </div>
+                </div>
+                {h.isin && <div style={{ fontSize:10, color:"#555", marginTop:10 }}>ISIN: {h.isin}</div>}
+              </div>
+            );
+          })}
+          {filteredHoldings.length === 0 && (
+            <div style={{ padding:"2rem", textAlign:"center", color:"#555" }}>Nessun risultato</div>
+          )}
+        </div>
+      ) : (
+        /* DESKTOP: tabella normale */
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%", fontSize:12.5 }}>
+            <thead><tr style={{ borderBottom:"0.5px solid #333" }}>
+              {[{l:"Titolo",c:"nome"},{l:"Banca",c:"banca"},{l:"Categoria",c:"categoria"},
+                {l:"Quote",c:"quantita"},{l:"P.Carico",c:"prezzoCarico"},
+                {l:"Controvalore",c:"controvaloreAttuale"},{l:"Stima oggi ⚠",c:"stimato"},
+                {l:"P&L €",c:"plusMinus"},{l:"Rend.%",c:"rendimentoAnnuo"}
+              ].map(({l,c}) => (
+                <th key={c} onClick={()=>c!=="stimato"&&handleSort(c)}
+                  style={{ textAlign:["nome","banca","categoria"].includes(c)?"left":"right",
+                    padding:"7px 8px", color:c==="stimato"?"#EF9F27":"#888",
+                    fontWeight:500, cursor:c!=="stimato"?"pointer":"default", whiteSpace:"nowrap" }}>
+                  {l}{c!=="stimato"&&<SortIcon col={c} />}
+                </th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {filteredHoldings.map((h,i) => {
+                const e = liveData.enriched.find(x=>x.nome===h.nome);
+                return (
+                  <tr key={i} style={{ borderBottom:"0.5px solid #222" }}>
+                    <td style={{ padding:"7px 8px", maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }} title={h.nome}>{h.nome}</td>
+                    <td style={{ padding:"7px 8px" }}>
+                      <span style={{ padding:"2px 6px", borderRadius:4, fontSize:11, background:`${BANKS[h.banca]?.color}25`, color:BANKS[h.banca]?.color, fontWeight:500 }}>{h.banca}</span>
+                    </td>
+                    <td style={{ padding:"7px 8px", color:"#888", fontSize:11 }}>{h.categoria}</td>
+                    <td style={{ padding:"7px 8px", textAlign:"right" }}>{h.quantita!=null?fmt(h.quantita):"—"}</td>
+                    <td style={{ padding:"7px 8px", textAlign:"right" }}>{h.prezzoCarico!=null?fmt(h.prezzoCarico,3):"—"}</td>
+                    <td style={{ padding:"7px 8px", textAlign:"right", fontWeight:500 }}>{fmtEur(h.controvaloreAttuale)}</td>
+                    <td style={{ padding:"7px 8px", textAlign:"right" }}>
+                      {e?.stimato!=null?(
+                        <span>
+                          <span style={{ fontWeight:500, color:e.stimato>=h.controvaloreAttuale?"#1D9E75":"#D85A30" }}>{fmtEur(e.stimato)}</span>
+                          <span style={{ fontSize:10, color:"#888", marginLeft:3 }}>({e.varPct>=0?"+":""}{fmt(e.varPct)}%)</span>
+                        </span>
+                      ):<span style={{ color:"#555" }}>{liveData.lastUpdate?"n/d":"—"}</span>}
+                    </td>
+                    <td style={{ padding:"7px 8px", textAlign:"right", color:h.plusMinus>0?"#1D9E75":h.plusMinus<0?"#D85A30":"#888" }}>{fmtEur(h.plusMinus)}</td>
+                    <td style={{ padding:"7px 8px", textAlign:"right", color:h.rendimentoAnnuo>0?"#1D9E75":h.rendimentoAnnuo<0?"#D85A30":"#888" }}>{fmtPct(h.rendimentoAnnuo)}</td>
+                  </tr>
+                );
+              })}
+              {filteredHoldings.length === 0 && (
+                <tr><td colSpan={9} style={{ padding:"2rem", textAlign:"center", color:"#555" }}>Nessun risultato</td></tr>
+              )}
+            </tbody>
+            <tfoot><tr style={{ borderTop:"0.5px solid #333", fontWeight:500 }}>
+              <td colSpan={5} style={{ padding:"7px 8px", color:"#888", fontSize:12 }}>{filteredHoldings.length} titoli</td>
+              <td style={{ padding:"7px 8px", textAlign:"right" }}>{fmtEur(totalCV)}</td>
+              <td style={{ padding:"7px 8px", textAlign:"right", color:"#EF9F27", fontSize:12 }}>
+                {liveData.lastUpdate?fmtEur(filteredHoldings.reduce((s,h)=>{const e=liveData.enriched.find(x=>x.nome===h.nome);return s+(e?.stimato??h.controvaloreAttuale??0);},0)):"—"}
+              </td>
+              <td style={{ padding:"7px 8px", textAlign:"right", color:totalPL>=0?"#1D9E75":"#D85A30" }}>{fmtEur(totalPL)}</td>
+              <td/>
+            </tr></tfoot>
+          </table>
+        </div>
+      )}
       {liveData.lastUpdate&&<div style={{ fontSize:11, color:"#EF9F27", marginTop:8, fontStyle:"italic" }}>⚠ "Stima oggi" applica la variazione % del benchmark al controvalore del {DATA_RIF}.</div>}
     </div>
   );
