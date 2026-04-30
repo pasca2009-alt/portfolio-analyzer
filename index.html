@@ -163,16 +163,32 @@ const callClaude = async (system, userPrompt, maxTokens = 2000) => {
   const key = window._claudeApiKey || "";
   if (!key) throw new Error("API Key non inserita — inseriscila in cima alla pagina");
   const prompt = system ? `${system}\n\n${userPrompt}` : userPrompt;
-  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 },
-    }),
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${key}`;
+  const body = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 },
   });
+
+  // Prova diretta prima, poi proxy CORS se fallisce
+  let resp;
+  try {
+    resp = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+  } catch(e) {
+    // CORS bloccato — usa proxy
+    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
+    resp = await fetch(proxy, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+  }
+
   const data = await resp.json();
-  if (data.error) throw new Error(data.error.message);
+  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error("Risposta vuota da Gemini");
   return text;
