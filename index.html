@@ -623,8 +623,8 @@ function AnalisiTab({ allHoldings, totalValue, byCat, catData }) {
 
   const run = async () => {
     setLoading(true); setAnalysis(""); setDone(false);
-    const summary = allHoldings.filter(h=>h.controvaloreAttuale>0).slice(0,15)
-      .map(h=>`${h.nome.slice(0,35)} (${h.categoria}): ${fmtEur(h.controvaloreAttuale)}`).join("\n");
+    const summary = allHoldings.filter(h=>h.controvaloreAttuale>0)
+      .map(h=>`${h.nome.slice(0,35)} [${h.banca}] (${h.categoria}): ${fmtEur(h.controvaloreAttuale)}`).join("\n");
     try {
       const text = await callClaude(null,
         `Sei un consulente finanziario italiano esperto. Analizza questo portafoglio BILANCIATO (totale ${fmtEur(totalValue)}):\n${summary}\n\nFornisci:\n1. **Valutazione generale**\n2. **Rischi principali** (3 punti)\n3. **Opportunità** (3 punti)\n4. **Raccomandazioni** per profilo bilanciato\n5. **Previsione 2026**`
@@ -967,9 +967,15 @@ function App() {
   const allHoldings = Object.values(bankData).flat();
   const liveData = useLivePrices(allHoldings);
 
-  // Holdings filtrati per AI (banca selezionata)
-  const aiHoldings = filterBankAI === "all" ? allHoldings : allHoldings.filter(h => h.banca === filterBankAI);
+  // Categorie liquidità (escluse dall'analisi AI)
+  const isLiquidita = h => h.categoria === "Monetario" || h.nome.toLowerCase().includes("conto corrente") || h.nome.toLowerCase().includes("libretto");
+
+  // Holdings filtrati per AI (banca selezionata) — separati in titoli e liquidità
+  const aiAllHoldings = filterBankAI === "all" ? allHoldings : allHoldings.filter(h => h.banca === filterBankAI);
+  const aiHoldings = aiAllHoldings.filter(h => !isLiquidita(h));         // solo titoli
+  const aiLiquidita = aiAllHoldings.filter(h => isLiquidita(h));          // solo C/C e libretti
   const aiTotalValue = aiHoldings.reduce((s,h) => s + (h.controvaloreAttuale||0), 0);
+  const aiTotalLiquidita = aiLiquidita.reduce((s,h) => s + (h.controvaloreAttuale||0), 0);
   const aiByCat = {};
   aiHoldings.forEach(h => { if(h.controvaloreAttuale) aiByCat[h.categoria] = (aiByCat[h.categoria]||0) + h.controvaloreAttuale; });
   const aiCatData = Object.entries(aiByCat).map(([label,value]) => ({ label, value, color: CATEGORY_COLORS[label]||"#888" })).sort((a,b) => b.value - a.value);
@@ -1086,9 +1092,9 @@ function App() {
 
         {activeTab==="dashboard"&&<DashboardTab allHoldings={allHoldings} totalValue={totalValue} totalPL={totalPL} totalPLpct={totalPLpct} byBank={byBank} catData={catData} liveData={liveData}/>}
         {activeTab==="titoli"&&<TitoliTab filteredHoldings={filteredHoldings} sortCol={sortCol} sortDir={sortDir} handleSort={handleSort} filterBank={filterBank} setFilterBank={setFilterBank} filterCat={filterCat} setFilterCat={setFilterCat} search={search} setSearch={setSearch} categories={categories} liveData={liveData} totalValue={totalValue}/>}
-        {activeTab==="analisi"&&<><AIBankFilter/><AnalisiTab allHoldings={aiHoldings} totalValue={aiTotalValue} byCat={aiByCat} catData={aiCatData}/></>}
-        {activeTab==="previsioni"&&<><AIBankFilter/><PrevisioniTab allHoldings={aiHoldings} totalValue={aiTotalValue}/></>}
-        {activeTab==="azioni"&&<><AIBankFilter/><AzioniTab allHoldings={aiHoldings} totalValue={aiTotalValue} byCat={aiByCat}/></>}
+        {activeTab==="analisi"&&<><AIBankFilter/>{aiTotalLiquidita>0&&<div style={{background:"#1e2235",borderRadius:10,padding:"10px 14px",marginBottom:"1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,color:"#888"}}>💰 Liquidità (esclusa dall'analisi)</span><span style={{fontSize:14,fontWeight:500,color:"#A0A0B0"}}>{fmtEur(aiTotalLiquidita)}</span></div>}<AnalisiTab allHoldings={aiHoldings} totalValue={aiTotalValue} byCat={aiByCat} catData={aiCatData}/></>}
+        {activeTab==="previsioni"&&<><AIBankFilter/>{aiTotalLiquidita>0&&<div style={{background:"#1e2235",borderRadius:10,padding:"10px 14px",marginBottom:"1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,color:"#888"}}>💰 Liquidità (esclusa dall'analisi)</span><span style={{fontSize:14,fontWeight:500,color:"#A0A0B0"}}>{fmtEur(aiTotalLiquidita)}</span></div>}<PrevisioniTab allHoldings={aiHoldings} totalValue={aiTotalValue}/></>}
+        {activeTab==="azioni"&&<><AIBankFilter/>{aiTotalLiquidita>0&&<div style={{background:"#1e2235",borderRadius:10,padding:"10px 14px",marginBottom:"1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,color:"#888"}}>💰 Liquidità (esclusa dall'analisi)</span><span style={{fontSize:14,fontWeight:500,color:"#A0A0B0"}}>{fmtEur(aiTotalLiquidita)}</span></div>}<AzioniTab allHoldings={aiHoldings} totalValue={aiTotalValue} byCat={aiByCat}/></>}
       </div>
     </div>
   );
