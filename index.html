@@ -8,1099 +8,677 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #12121e; color: white; font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; }
-  input, select, button { font-family: inherit; }
-  table { border-collapse: collapse; }
-  @media (max-width: 600px) {
-    .grid-3 { grid-template-columns: 1fr 1fr !important; }
-    .grid-2 { grid-template-columns: 1fr !important; }
-    .bank-totals { grid-template-columns: 1fr !important; }
-    h1 { font-size: 18px !important; }
-    .tab-btn { padding: 5px 10px !important; font-size: 12px !important; }
-  }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#12121e;color:white;font-family:system-ui,sans-serif;min-height:100vh;}
+input,select,button{font-family:inherit;}
+table{border-collapse:collapse;}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel" data-presets="react">
+const{useState,useCallback,useRef,useEffect}=React;
 
-const { useState, useCallback, useRef } = React;
+const BANKS={MD:{name:"Mediolanum",color:"#1D9E75"},BPER:{name:"BPER Banca",color:"#378ADD"},PI:{name:"Poste Italiane",color:"#D85A30"}};
+const CAT_COLORS={"Azionari internazionali":"#7F77DD","Azionari settoriali":"#1D9E75","Obbligazionario Convertibili":"#378ADD","Obbligazioni paesi emergenti":"#EF9F27","Obbligazioni High Yield":"#D85A30","Obbligazionari diversified":"#5DCAA5","Azionari paesi emergenti":"#D4537E","Azionari nord america":"#6399BB","assicurativo":"#888780","Monetario":"#A0A0B0"};
+const BENCHMARK={"Azionari internazionali":{ticker:"URTH"},"Azionari settoriali":{ticker:"URTH"},"Azionari nord america":{ticker:"SPY"},"Azionari paesi emergenti":{ticker:"EEM"},"Obbligazionari diversified":{ticker:"AGG"},"Obbligazioni High Yield":{ticker:"HYG"},"Obbligazioni paesi emergenti":{ticker:"EMB"},"Obbligazionario Convertibili":{ticker:"CWB"},"assicurativo":{ticker:null},"Monetario":{ticker:null}};
+const CAT_REND={"Azionari internazionali":9.5,"Azionari settoriali":7.0,"Azionari paesi emergenti":6.0,"Azionari nord america":10.0,"Obbligazionario Convertibili":4.5,"Obbligazioni paesi emergenti":3.5,"Obbligazioni High Yield":5.5,"Obbligazionari diversified":3.0,"assicurativo":4.0,"Monetario":0.5};
+const AZIONE_META={vendi:{color:"#D85A30",bg:"#D85A3015",label:"Riduci/Vendi",icon:"↓"},monitora:{color:"#EF9F27",bg:"#EF9F2715",label:"Monitora",icon:"◎"},mantieni:{color:"#888780",bg:"#88878015",label:"Mantieni",icon:"→"},incrementa:{color:"#1D9E75",bg:"#1D9E7515",label:"Incrementa",icon:"↑"},switch:{color:"#7F77DD",bg:"#7F77DD15",label:"Valuta Switch",icon:"⇄"}};
+const DATA_RIF="2026-04-22";
 
-const BANKS = {
-  MD:   { name: "Mediolanum",    color: "#1D9E75" },
-  BPER: { name: "BPER Banca",    color: "#378ADD" },
-  PI:   { name: "Poste Italiane",color: "#D85A30" },
-};
-
-const CATEGORY_COLORS = {
-  "Azionari internazionali":      "#7F77DD",
-  "Azionari settoriali":          "#1D9E75",
-  "Obbligazionario Convertibili": "#378ADD",
-  "Obbligazioni paesi emergenti": "#EF9F27",
-  "Obbligazioni High Yield":      "#D85A30",
-  "Obbligazionari diversified":   "#5DCAA5",
-  "Azionari paesi emergenti":     "#D4537E",
-  "Azionari nord america":        "#6399BB",
-  "assicurativo":                 "#888780",
-  "Monetario":                    "#A0A0B0",
-};
-
-const BENCHMARK = {
-  "Azionari internazionali":      { ticker: "URTH", nome: "MSCI World ETF" },
-  "Azionari settoriali":          { ticker: "URTH", nome: "MSCI World ETF" },
-  "Azionari nord america":        { ticker: "SPY",  nome: "S&P 500 ETF" },
-  "Azionari paesi emergenti":     { ticker: "EEM",  nome: "MSCI Emerging Markets ETF" },
-  "Obbligazionari diversified":   { ticker: "AGG",  nome: "Bloomberg Agg Bond ETF" },
-  "Obbligazioni High Yield":      { ticker: "HYG",  nome: "iBoxx High Yield ETF" },
-  "Obbligazioni paesi emergenti": { ticker: "EMB",  nome: "EM Bond ETF" },
-  "Obbligazionario Convertibili": { ticker: "CWB",  nome: "Convertible Bond ETF" },
-  "assicurativo":                 { ticker: null,   nome: "—" },
-};
-
-const CAT_RENDIMENTO = {
-  "Azionari internazionali":      9.5,
-  "Azionari settoriali":          7.0,
-  "Azionari paesi emergenti":     6.0,
-  "Azionari nord america":        10.0,
-  "Obbligazionario Convertibili": 4.5,
-  "Obbligazioni paesi emergenti": 3.5,
-  "Obbligazioni High Yield":      5.5,
-  "Obbligazionari diversified":   3.0,
-  "assicurativo":                 4.0,
-};
-
-const AZIONE_META = {
-  vendi:      { color: "#D85A30", bg: "#D85A3015", label: "Riduci / Vendi",  icon: "↓" },
-  monitora:   { color: "#EF9F27", bg: "#EF9F2715", label: "Monitora",        icon: "◎" },
-  mantieni:   { color: "#888780", bg: "#88878015", label: "Mantieni",        icon: "→" },
-  incrementa: { color: "#1D9E75", bg: "#1D9E7515", label: "Incrementa",      icon: "↑" },
-  switch:     { color: "#7F77DD", bg: "#7F77DD15", label: "Valuta Switch",   icon: "⇄" },
-};
-
-const DATA_RIF = "2026-04-22";
-
-const MEDIOLANUM_DATA = [
-  { nome: "MBB convertibile strategy collection LHA EUR PIC",          isin: "IE00B9CQ9016", quantita: 1574.83, prezzoCarico: null,   controvaloreAttuale: 9932.44,  categoria: "Obbligazionario Convertibili", banca: "MD", plusMinus: null,     rendimentoAnnuo: null },
-  { nome: "MBB Emerging markets fixed income LHA EUR PIC",             isin: "IE00BJYLJD74", quantita: 2165.71, prezzoCarico: null,   controvaloreAttuale: 9769.52,  categoria: "Obbligazioni paesi emergenti", banca: "MD", plusMinus: null,     rendimentoAnnuo: null },
-  { nome: "MBB Global High Yield LHA EUR",                             isin: "IE00B04KP668", quantita: 1287.64, prezzoCarico: null,   controvaloreAttuale: 10342.32, categoria: "Obbligazioni High Yield",      banca: "MD", plusMinus: null,     rendimentoAnnuo: null },
-  { nome: "MBB Mediolanum global sustainable bond LA",                 isin: "IE000WHTCTA",  quantita: 2938.48, prezzoCarico: null,   controvaloreAttuale: 14815.81, categoria: "Obbligazionari diversified",   banca: "MD", plusMinus: null,     rendimentoAnnuo: null },
-  { nome: "MBB circular economy opportunities LHA EUR PIC",            isin: "IE000H4P2KR2", quantita: 3770.74, prezzoCarico: null,   controvaloreAttuale: 18657.64, categoria: "Azionari settoriali",          banca: "MD", plusMinus: null,     rendimentoAnnuo: null },
-  { nome: "MBB Dynamic international value opportunity LHA EUR PIC",   isin: "IE00BYZ2YB75", quantita: 2237.31, prezzoCarico: null,   controvaloreAttuale: 18815.74, categoria: "Azionari internazionali",      banca: "MD", plusMinus: null,     rendimentoAnnuo: null },
-  { nome: "MBB global leaders LHA EUR PIC",                            isin: "IE00BJYLJ930", quantita: 2448.96, prezzoCarico: 7.146,  controvaloreAttuale: 17500.30, categoria: "Azionari internazionali",      banca: "MD", plusMinus: 1342.32,  rendimentoAnnuo: 13.774 },
-  { nome: "MBB Mediolanum Morgan Stanley global selection LHA EUR PIC", isin: "IE00B2NLMV86", quantita: 1622.86, prezzoCarico: 8.41,  controvaloreAttuale: 18257.13, categoria: "Azionari internazionali",      banca: "MD", plusMinus: 1345.12,  rendimentoAnnuo: 11.637 },
-  { nome: "Challenge energy opportunities LA EUR PAC",                 isin: "IE0004460683", quantita: 590.51,  prezzoCarico: null,   controvaloreAttuale: 5845.43,  categoria: "Azionari settoriali",          banca: "MD", plusMinus: null,     rendimentoAnnuo: null },
-  { nome: "Challenge healthcare opportunities LA EUR PAC",             isin: "IE0004479642", quantita: 668.40,  prezzoCarico: null,   controvaloreAttuale: 4392.07,  categoria: "Azionari settoriali",          banca: "MD", plusMinus: null,     rendimentoAnnuo: null },
-  { nome: "Challenge industrials and materials opportunities LA EUR PAC", isin: "IE0004462408", quantita: 397.41, prezzoCarico: null,  controvaloreAttuale: 6276.74,  categoria: "Azionari settoriali",          banca: "MD", plusMinus: null,     rendimentoAnnuo: null },
-  { nome: "Challenge international equity fund LHA EUR PAC",           isin: "IE00B60DM373", quantita: 420.46,  prezzoCarico: null,   controvaloreAttuale: 6076.50,  categoria: "Azionari internazionali",      banca: "MD", plusMinus: null,     rendimentoAnnuo: null },
-  { nome: "Challenge north american equity fund LHA EUR PAC",          isin: "IE00B6072284", quantita: 317.20,  prezzoCarico: 19.207, controvaloreAttuale: 6092.48,  categoria: "Azionari nord america",        banca: "MD", plusMinus: -108.43,  rendimentoAnnuo: -0.936 },
-  { nome: "MBB global small cap equity LA EUR PIC",                    isin: "IE00BJYLJG06", quantita: 895.13,  prezzoCarico: null,   controvaloreAttuale: 6222.95,  categoria: "Azionari internazionali",      banca: "MD", plusMinus: null,     rendimentoAnnuo: null },
-  { nome: "Mediolanum energy transition L PIC",                        isin: "IE000V4RVQ80", quantita: 1143.91, prezzoCarico: null,   controvaloreAttuale: 6323.52,  categoria: "Azionari settoriali",          banca: "MD", plusMinus: null,     rendimentoAnnuo: null },
-  { nome: "Mediolanum future sustainable nutrition LA EUR PIC",        isin: "IE0000DBVC71", quantita: 1071.17, prezzoCarico: null,   controvaloreAttuale: 4246.11,  categoria: "Azionari settoriali",          banca: "MD", plusMinus: null,     rendimentoAnnuo: null },
-  { nome: "Mediolanum global equity style selection LA PIC",           isin: "IE000TCXNA99", quantita: 1666.89, prezzoCarico: 6.365,  controvaloreAttuale: 10609.74, categoria: "Azionari internazionali",      banca: "MD", plusMinus: 599.89,   rendimentoAnnuo: 5.019 },
-  { nome: "Mediolanum India opportunities LA PIC",                     isin: "IE000K6M6613", quantita: 1481.03, prezzoCarico: 5.635,  controvaloreAttuale: 8345.59,  categoria: "Azionari paesi emergenti",    banca: "MD", plusMinus: -1654.10, rendimentoAnnuo: -13.611 },
-  { nome: "Polizza Mediolanum Intelligent Life Plan",                  isin: null,           quantita: 1,       prezzoCarico: 35000,  controvaloreAttuale: 43598.50, categoria: "assicurativo",                banca: "MD", plusMinus: 8619.11,  rendimentoAnnuo: 11.748 },
+const MD_DATA=[
+  {nome:"MBB convertibile strategy collection LHA EUR PIC",isin:"IE00B9CQ9016",quantita:1574.83,prezzoCarico:null,controvaloreAttuale:9932.44,categoria:"Obbligazionario Convertibili",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"MBB Emerging markets fixed income LHA EUR PIC",isin:"IE00BJYLJD74",quantita:2165.71,prezzoCarico:null,controvaloreAttuale:9769.52,categoria:"Obbligazioni paesi emergenti",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"MBB Global High Yield LHA EUR",isin:"IE00B04KP668",quantita:1287.64,prezzoCarico:null,controvaloreAttuale:10342.32,categoria:"Obbligazioni High Yield",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"MBB Mediolanum global sustainable bond LA",isin:"IE000WHTCTA",quantita:2938.48,prezzoCarico:null,controvaloreAttuale:14815.81,categoria:"Obbligazionari diversified",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"MBB circular economy opportunities LHA EUR PIC",isin:"IE000H4P2KR2",quantita:3770.74,prezzoCarico:null,controvaloreAttuale:18657.64,categoria:"Azionari settoriali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"MBB Dynamic international value opportunity LHA EUR PIC",isin:"IE00BYZ2YB75",quantita:2237.31,prezzoCarico:null,controvaloreAttuale:18815.74,categoria:"Azionari internazionali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"MBB global leaders LHA EUR PIC",isin:"IE00BJYLJ930",quantita:2448.96,prezzoCarico:7.146,controvaloreAttuale:17500.30,categoria:"Azionari internazionali",banca:"MD",plusMinus:1342.32,rendimentoAnnuo:13.774},
+  {nome:"MBB Mediolanum Morgan Stanley global selection LHA EUR PIC",isin:"IE00B2NLMV86",quantita:1622.86,prezzoCarico:8.41,controvaloreAttuale:18257.13,categoria:"Azionari internazionali",banca:"MD",plusMinus:1345.12,rendimentoAnnuo:11.637},
+  {nome:"Challenge energy opportunities LA EUR PAC",isin:"IE0004460683",quantita:590.51,prezzoCarico:null,controvaloreAttuale:5845.43,categoria:"Azionari settoriali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Challenge healthcare opportunities LA EUR PAC",isin:"IE0004479642",quantita:668.40,prezzoCarico:null,controvaloreAttuale:4392.07,categoria:"Azionari settoriali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Challenge industrials and materials opportunities LA EUR PAC",isin:"IE0004462408",quantita:397.41,prezzoCarico:null,controvaloreAttuale:6276.74,categoria:"Azionari settoriali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Challenge international equity fund LHA EUR PAC",isin:"IE00B60DM373",quantita:420.46,prezzoCarico:null,controvaloreAttuale:6076.50,categoria:"Azionari internazionali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Challenge north american equity fund LHA EUR PAC",isin:"IE00B6072284",quantita:317.20,prezzoCarico:19.207,controvaloreAttuale:6092.48,categoria:"Azionari nord america",banca:"MD",plusMinus:-108.43,rendimentoAnnuo:-0.936},
+  {nome:"MBB global small cap equity LA EUR PIC",isin:"IE00BJYLJG06",quantita:895.13,prezzoCarico:null,controvaloreAttuale:6222.95,categoria:"Azionari internazionali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Mediolanum energy transition L PIC",isin:"IE000V4RVQ80",quantita:1143.91,prezzoCarico:null,controvaloreAttuale:6323.52,categoria:"Azionari settoriali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Mediolanum future sustainable nutrition LA EUR PIC",isin:"IE0000DBVC71",quantita:1071.17,prezzoCarico:null,controvaloreAttuale:4246.11,categoria:"Azionari settoriali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Mediolanum global equity style selection LA PIC",isin:"IE000TCXNA99",quantita:1666.89,prezzoCarico:6.365,controvaloreAttuale:10609.74,categoria:"Azionari internazionali",banca:"MD",plusMinus:599.89,rendimentoAnnuo:5.019},
+  {nome:"Mediolanum India opportunities LA PIC",isin:"IE000K6M6613",quantita:1481.03,prezzoCarico:5.635,controvaloreAttuale:8345.59,categoria:"Azionari paesi emergenti",banca:"MD",plusMinus:-1654.10,rendimentoAnnuo:-13.611},
+  {nome:"Polizza Mediolanum Intelligent Life Plan",isin:null,quantita:1,prezzoCarico:35000,controvaloreAttuale:43598.50,categoria:"assicurativo",banca:"MD",plusMinus:8619.11,rendimentoAnnuo:11.748},
+  {nome:"Conto Corrente Mediolanum",isin:null,quantita:1,prezzoCarico:null,controvaloreAttuale:5790,categoria:"Monetario",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
+];
+const BPER_DATA=[
+  {nome:"Arca R Val Re 27 2 R",isin:"IT0005483430",quantita:5999.300,prezzoCarico:5.000,controvaloreAttuale:36835.70,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Arca Ri Div Bond P",isin:"IT0000380029",quantita:2137.921,prezzoCarico:11.286,controvaloreAttuale:27361.11,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Arca Te",isin:"IT0000384641",quantita:996.922,prezzoCarico:23.680,controvaloreAttuale:26493.20,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Arca Val Re 27 3 R",isin:"IT0005494643",quantita:3999.300,prezzoCarico:5.000,controvaloreAttuale:25579.52,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Bper GI Cv Bond",isin:"LU0079194363",quantita:66.871,prezzoCarico:199.020,controvaloreAttuale:18348.06,categoria:"Obbligazionario Convertibili",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Bper Global Bond",isin:"LU0087341626",quantita:38.209,prezzoCarico:169.102,controvaloreAttuale:6403.45,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Etica Bilanciato P",isin:"IT0003409213",quantita:1296.056,prezzoCarico:13.513,controvaloreAttuale:20371.41,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Etica Red Bill Crd P",isin:"IT0005117558",quantita:4425.670,prezzoCarico:4.958,controvaloreAttuale:21203.38,categoria:"Obbligazioni paesi emergenti",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Arca Bb",isin:"IT0000380003",quantita:293.76,prezzoCarico:51.403,controvaloreAttuale:12163.54,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Arca Bond Corp",isin:"IT0003021990",quantita:80.350,prezzoCarico:9.889,controvaloreAttuale:2446.12,categoria:"Obbligazioni High Yield",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Arca Bond P Emerg P",isin:"IT0001248373",quantita:20.008,prezzoCarico:18.098,controvaloreAttuale:1607.64,categoria:"Obbligazioni paesi emergenti",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Arca Ced Att 26 R",isin:"IT0005494601",quantita:4999.300,prezzoCarico:5.203,controvaloreAttuale:26061.36,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Arca Dinamico P",isin:"IT0003995239",quantita:1336.451,prezzoCarico:9.143,controvaloreAttuale:12219.17,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Arca Equilibrio P",isin:"IT0003956197",quantita:1921.234,prezzoCarico:7.365,controvaloreAttuale:14149.89,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Arca Ft Ced Pl 30 3R",isin:"IT0005635294",quantita:3997.65,prezzoCarico:5.011,controvaloreAttuale:20040.49,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Arca Obl Europa",isin:"IT0000124824",quantita:1911.765,prezzoCarico:13.420,controvaloreAttuale:25655.89,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Arca Oft Uso 30 R",isin:"IT0005653237",quantita:1999.300,prezzoCarico:5.126,controvaloreAttuale:10248.41,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Arca Oxy Plus 50 Acc",isin:"IT0005106718",quantita:1642.763,prezzoCarico:6.794,controvaloreAttuale:11160.93,categoria:"Azionari internazionali",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"Conto Corrente BPER",isin:null,quantita:1,prezzoCarico:null,controvaloreAttuale:7746.51,categoria:"Monetario",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
+];
+const PI_DATA=[
+  {nome:"Poste Domani Per Te Plus",isin:null,quantita:1,prezzoCarico:null,controvaloreAttuale:20587.73,categoria:"assicurativo",banca:"PI",plusMinus:null,rendimentoAnnuo:0.77},
+  {nome:"Poste Progetto Dinamico Bonus",isin:null,quantita:1,prezzoCarico:null,controvaloreAttuale:33402.21,categoria:"assicurativo",banca:"PI",plusMinus:null,rendimentoAnnuo:2.64},
+  {nome:"Libretto Smart Poste",isin:null,quantita:1,prezzoCarico:null,controvaloreAttuale:2335.65,categoria:"Monetario",banca:"PI",plusMinus:null,rendimentoAnnuo:null},
 ];
 
-const BPER_DATA = [
-  { nome: "Arca R Val Re 27 2 R",    isin: "IT0005483430", quantita: 5999.300, prezzoCarico: 5.000,   controvaloreAttuale: 36835.70, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Arca Ri Div Bond P",       isin: "IT0000380029", quantita: 2137.921, prezzoCarico: 11.286,  controvaloreAttuale: 27361.11, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Arca Te",                  isin: "IT0000384641", quantita: 996.922,  prezzoCarico: 23.680,  controvaloreAttuale: 26493.20, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Arca Val Re 27 3 R",       isin: "IT0005494643", quantita: 3999.300, prezzoCarico: 5.000,   controvaloreAttuale: 25579.52, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Bper GI Cv Bond",          isin: "LU0079194363", quantita: 66.871,   prezzoCarico: 199.020, controvaloreAttuale: 18348.06, categoria: "Obbligazionario Convertibili", banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Bper Global Bond",         isin: "LU0087341626", quantita: 38.209,   prezzoCarico: 169.102, controvaloreAttuale: 6403.45,  categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Etica Bilanciato P",       isin: "IT0003409213", quantita: 1296.056, prezzoCarico: 13.513,  controvaloreAttuale: 20371.41, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Etica Red Bill Crd P",     isin: "IT0005117558", quantita: 4425.670, prezzoCarico: 4.958,   controvaloreAttuale: 21203.38, categoria: "Obbligazioni paesi emergenti", banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Arca Bb",                  isin: "IT0000380003", quantita: 293.76,   prezzoCarico: 51.403,  controvaloreAttuale: 12163.54, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Arca Bond Corp",           isin: "IT0003021990", quantita: 80.350,   prezzoCarico: 9.889,   controvaloreAttuale: 2446.12,  categoria: "Obbligazioni High Yield",      banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Arca Bond P Emerg P",      isin: "IT0001248373", quantita: 20.008,   prezzoCarico: 18.098,  controvaloreAttuale: 1607.64,  categoria: "Obbligazioni paesi emergenti", banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Arca Ced Att 26 R",        isin: "IT0005494601", quantita: 4999.300, prezzoCarico: 5.203,   controvaloreAttuale: 26061.36, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Arca Dinamico P",          isin: "IT0003995239", quantita: 1336.451, prezzoCarico: 9.143,   controvaloreAttuale: 12219.17, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Arca Equilibrio P",        isin: "IT0003956197", quantita: 1921.234, prezzoCarico: 7.365,   controvaloreAttuale: 14149.89, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Arca Ft Ced Pl 30 3R",     isin: "IT0005635294", quantita: 3997.65,  prezzoCarico: 5.011,   controvaloreAttuale: 20040.49, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Arca Obl Europa",          isin: "IT0000124824", quantita: 1911.765, prezzoCarico: 13.420,  controvaloreAttuale: 25655.89, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Arca Oft Uso 30 R",        isin: "IT0005653237", quantita: 1999.300, prezzoCarico: 5.126,   controvaloreAttuale: 10248.41, categoria: "Obbligazionari diversified",   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Arca Oxy Plus 50 Acc",     isin: "IT0005106718", quantita: 1642.763, prezzoCarico: 6.794,   controvaloreAttuale: 11160.93, categoria: "Azionari internazionali",      banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-  { nome: "Conto Corrente BPER",      isin: null,           quantita: 1,        prezzoCarico: null,    controvaloreAttuale: 7746.51,  categoria: "Monetario",                   banca: "BPER", plusMinus: null, rendimentoAnnuo: null },
-];
+const fmt=(n,dec=2)=>n==null||isNaN(n)?"—":new Intl.NumberFormat("it-IT",{minimumFractionDigits:dec,maximumFractionDigits:dec}).format(n);
+const fmtEur=n=>n==null||isNaN(n)?"—":"€"+new Intl.NumberFormat("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
+const fmtPct=n=>n==null||isNaN(n)?"—":(n>=0?"+":"")+fmt(n)+"%";
+const getRend=h=>h.rendimentoAnnuo!=null?h.rendimentoAnnuo:(CAT_REND[h.categoria]??5.0);
+const isLiq=h=>h.categoria==="Monetario"||h.nome.toLowerCase().includes("conto corrente")||h.nome.toLowerCase().includes("libretto");
 
-const PI_DATA = [
-  { nome: "Poste Domani Per Te Plus",      isin: null, quantita: 1, prezzoCarico: null, controvaloreAttuale: 20587.73, categoria: "assicurativo", banca: "PI", plusMinus: null, rendimentoAnnuo: 0.77 },
-  { nome: "Poste Progetto Dinamico Bonus", isin: null, quantita: 1, prezzoCarico: null, controvaloreAttuale: 33402.21, categoria: "assicurativo", banca: "PI", plusMinus: null, rendimentoAnnuo: 2.64 },
-  { nome: "Libretto Smart Poste",          isin: null, quantita: 1, prezzoCarico: null, controvaloreAttuale: 2335.65,  categoria: "Monetario",    banca: "PI", plusMinus: null, rendimentoAnnuo: null },
-];
-
-const fmt = (n, dec = 2) => {
-  return new Intl.NumberFormat("it-IT", { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(n);
-};
-const fmtEur = (n) => {
-  if (n === null || n === undefined || isNaN(n)) return "—";
-  return "€" + new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
-};
-const fmtPct = (n) => {
-  if (n === null || n === undefined || isNaN(n)) return "—";
-  return (n >= 0 ? "+" : "") + fmt(n) + "%";
-};
-const getRendimento = (h) =>
-  h.rendimentoAnnuo !== null && h.rendimentoAnnuo !== undefined
-    ? h.rendimentoAnnuo : CAT_RENDIMENTO[h.categoria] ?? 5.0;
-
-const extractJSON = (text) => {
-  const md = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (md) { try { return JSON.parse(md[1].trim()); } catch (_) {} }
-  const s = text.indexOf("{");
-  if (s !== -1) {
-    let d = 0;
-    for (let i = s; i < text.length; i++) {
-      if (text[i] === "{") d++;
-      else if (text[i] === "}") { d--; if (d === 0) return JSON.parse(text.slice(s, i + 1)); }
-    }
-  }
+const extractJSON=text=>{
+  const md=text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if(md){try{return JSON.parse(md[1].trim());}catch(_){}}
+  const s=text.indexOf("{");
+  if(s!==-1){let d=0;for(let i=s;i<text.length;i++){if(text[i]==="{")d++;else if(text[i]==="}"){ d--;if(d===0)return JSON.parse(text.slice(s,i+1));}}};
   throw new Error("Nessun JSON trovato");
 };
 
-const callClaude = async (system, userPrompt, maxTokens = 2000) => {
-  const key = window._claudeApiKey || "";
-  if (!key) throw new Error("API Key non inserita — inseriscila in cima alla pagina");
-  const prompt = system ? `${system}\n\n${userPrompt}` : userPrompt;
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${key}`;
-  const body = JSON.stringify({
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 },
-  });
-
-  // Prova diretta prima, poi proxy CORS se fallisce
+const callAI=async(system,prompt,maxTokens=2000)=>{
+  const key=window._aiKey||"";
+  if(!key)throw new Error("API Key non inserita");
+  const full=system?system+"\n\n"+prompt:prompt;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${key}`;
+  const body=JSON.stringify({contents:[{parts:[{text:full}]}],generationConfig:{maxOutputTokens:maxTokens,temperature:0.7}});
   let resp;
-  try {
-    resp = await fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-  } catch(e) {
-    // CORS bloccato — usa proxy
-    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
-    resp = await fetch(proxy, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-  }
-
-  const data = await resp.json();
-  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("Risposta vuota da Gemini");
+  try{resp=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body});}
+  catch(e){resp=await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,{method:"POST",headers:{"Content-Type":"application/json"},body});}
+  const data=await resp.json();
+  if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
+  const text=data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if(!text)throw new Error("Risposta vuota");
   return text;
 };
 
-async function fetchYahoo(ticker) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1mo`;
-  const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-  const resp = await fetch(proxy);
-  const data = await resp.json();
-  const result = data?.chart?.result?.[0];
-  if (!result) throw new Error("no data");
-  const timestamps = result.timestamp;
-  const closes = result.indicators.quote[0].close;
-  const refDate = new Date(DATA_RIF).getTime() / 1000;
-  let refIdx = 0, minDiff = Infinity;
-  timestamps.forEach((t, i) => { const d = Math.abs(t - refDate); if (d < minDiff) { minDiff = d; refIdx = i; } });
-  const priceRef = closes[refIdx];
-  const priceNow = closes[closes.length - 1];
-  return { priceRef, priceNow, varPct: ((priceNow - priceRef) / priceRef) * 100, ticker };
+async function fetchYahoo(ticker){
+  const url=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1mo`;
+  const resp=await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+  const data=await resp.json();
+  const r=data?.chart?.result?.[0];
+  if(!r)throw new Error("no data");
+  const ts=r.timestamp,closes=r.indicators.quote[0].close;
+  const ref=new Date(DATA_RIF).getTime()/1000;
+  let ri=0,md=Infinity;
+  ts.forEach((t,i)=>{const d=Math.abs(t-ref);if(d<md){md=d;ri=i;}});
+  return{varPct:((closes[closes.length-1]-closes[ri])/closes[ri])*100};
 }
 
-function useLivePrices(holdings) {
-  const [prices, setPrices] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [error, setError] = useState(null);
-
-  const refresh = useCallback(async () => {
-    setLoading(true); setError(null);
-    const tickers = [...new Set(holdings.map(h => BENCHMARK[h.categoria]?.ticker).filter(Boolean))];
-    const results = {}, errors = [];
-    await Promise.all(tickers.map(async t => {
-      try { results[t] = await fetchYahoo(t); } catch { errors.push(t); }
-    }));
-    setPrices(results);
-    setLastUpdate(new Date());
-    if (errors.length) setError(`N/D per: ${errors.join(", ")}`);
+function useLivePrices(holdings){
+  const[prices,setPrices]=useState({});
+  const[loading,setLoading]=useState(false);
+  const[lastUpdate,setLastUpdate]=useState(null);
+  const[error,setError]=useState(null);
+  const refresh=useCallback(async()=>{
+    setLoading(true);setError(null);
+    const tickers=[...new Set(holdings.map(h=>BENCHMARK[h.categoria]?.ticker).filter(Boolean))];
+    const res={},errs=[];
+    await Promise.all(tickers.map(async t=>{try{res[t]=await fetchYahoo(t);}catch{errs.push(t);}}));
+    setPrices(res);setLastUpdate(new Date());
+    if(errs.length)setError(`N/D: ${errs.join(", ")}`);
     setLoading(false);
-  }, [holdings]);
-
-  const enriched = holdings.map(h => {
-    const bench = BENCHMARK[h.categoria];
-    if (!bench?.ticker || !prices[bench.ticker]) return { ...h, stimato: null, varPct: null, benchmark: bench };
-    const { varPct } = prices[bench.ticker];
-    return { ...h, stimato: h.controvaloreAttuale * (1 + varPct / 100), varPct, benchmark: bench };
+  },[holdings]);
+  const enriched=holdings.map(h=>{
+    const b=BENCHMARK[h.categoria];
+    if(!b?.ticker||!prices[b.ticker])return{...h,stimato:null,varPct:null};
+    return{...h,stimato:h.controvaloreAttuale*(1+prices[b.ticker].varPct/100),varPct:prices[b.ticker].varPct};
   });
-
-  const totalStimato = enriched.reduce((s, h) => s + (h.stimato ?? h.controvaloreAttuale), 0);
-  return { enriched, loading, lastUpdate, error, refresh, totalStimato };
+  const totalStimato=enriched.reduce((s,h)=>s+(h.stimato??h.controvaloreAttuale),0);
+  return{enriched,loading,lastUpdate,error,refresh,totalStimato};
 }
 
-function PieChart({ data, size = 150 }) {
-  const total = data.reduce((s, d) => s + d.value, 0);
-  if (!total) return null;
-  let cum = -Math.PI / 2;
-  const R = size / 2 - 8;
-  const cx = size / 2, cy = size / 2;
-  const slices = data.map(d => {
-    const angle = (d.value / total) * 2 * Math.PI;
-    const x1 = cx + R * Math.cos(cum), y1 = cy + R * Math.sin(cum);
-    cum += angle;
-    const x2 = cx + R * Math.cos(cum), y2 = cy + R * Math.sin(cum);
-    return { ...d, x1, y1, x2, y2, large: angle > Math.PI ? 1 : 0 };
+function PieChart({data,size=110}){
+  const total=data.reduce((s,d)=>s+d.value,0);
+  if(!total)return null;
+  let cum=-Math.PI/2;
+  const R=size/2-6,cx=size/2,cy=size/2;
+  const slices=data.map(d=>{
+    const a=(d.value/total)*2*Math.PI;
+    const x1=cx+R*Math.cos(cum),y1=cy+R*Math.sin(cum);
+    cum+=a;
+    return{...d,x1,y1,x2:cx+R*Math.cos(cum),y2:cy+R*Math.sin(cum),large:a>Math.PI?1:0};
   });
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      {slices.map((s, i) => (
-        <path key={i} d={`M${cx} ${cy} L${s.x1} ${s.y1} A${R} ${R} 0 ${s.large} 1 ${s.x2} ${s.y2}Z`}
-          fill={s.color} opacity={0.9} stroke="#00000020" strokeWidth={1} />
-      ))}
-      <circle cx={cx} cy={cy} r={R * 0.45} fill="#12121e" />
-    </svg>
-  );
+  return(<svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+    {slices.map((s,i)=><path key={i} d={`M${cx} ${cy}L${s.x1} ${s.y1}A${R} ${R} 0 ${s.large} 1 ${s.x2} ${s.y2}Z`} fill={s.color} opacity={0.9} stroke="#00000020" strokeWidth={1}/>)}
+    <circle cx={cx} cy={cy} r={R*0.42} fill="#12121e"/>
+  </svg>);
 }
 
-function LineChart({ months, series, height = 180 }) {
-  const W = 560, H = height, PL = 52, PR = 12, PT = 12, PB = 28;
-  const allVals = series.flatMap(s => s.data);
-  const minV = Math.min(...allVals) * 0.995, maxV = Math.max(...allVals) * 1.005;
-  const xS = i => PL + (i / (months.length - 1)) * (W - PL - PR);
-  const yS = v => PT + (1 - (v - minV) / (maxV - minV)) * (H - PT - PB);
-  const path = data => data.map((v, i) => `${i === 0 ? "M" : "L"}${xS(i).toFixed(1)} ${yS(v).toFixed(1)}`).join(" ");
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: H, display: "block" }}>
-      {[0,1,2,3,4].map(i => {
-        const v = minV + (i / 4) * (maxV - minV), y = yS(v);
-        return <g key={i}>
-          <line x1={PL} x2={W-PR} y1={y} y2={y} stroke="#ffffff10" strokeWidth={0.5} />
-          <text x={PL-4} y={y+4} textAnchor="end" fontSize={10} fill="#888">{Math.round(v/1000)}k</text>
-        </g>;
-      })}
-      {months.map((m, i) => (
-        <text key={i} x={xS(i)} y={H-6} textAnchor="middle" fontSize={10} fill="#888">{m}</text>
-      ))}
-      {series.map((s, i) => (
-        <path key={i} d={path(s.data)} fill="none" stroke={s.color}
-          strokeWidth={s.width ?? 1.5} strokeDasharray={s.dash ?? "none"} opacity={s.opacity ?? 1} />
-      ))}
-    </svg>
-  );
-}
-
-function UploadZone({ bankCode, onData, hasData }) {
-  const [dragging, setDragging] = useState(false);
-  const ref = useRef();
-  const bank = BANKS[bankCode];
-
-  const parse = (text) => {
-    const lines = text.trim().split("\n");
-    const header = lines[0].split(";").map(h => h.trim().replace(/^\uFEFF/, ""));
-    return lines.slice(1).map(line => {
-      const vals = line.split(";");
-      const o = {};
-      header.forEach((h, i) => { o[h] = vals[i]?.trim() || ""; });
-      const n = s => s ? parseFloat(s.replace(/\./g, "").replace(",", ".")) || null : null;
-      return {
-        nome: o.Nome || o.nome || "",
-        isin: o.ISIN || o.isin || null,
-        quantita: n(o["Quantità"] || o.quantita),
-        prezzoCarico: n(o.Prezzo_Carico || o.prezzo_carico),
-        controvaloreAttuale: n(o.Prezzo_Attuale || o.prezzo_attuale),
-        categoria: o.Categoria || o.categoria || "Altro",
-        banca: bankCode, plusMinus: null, rendimentoAnnuo: null,
-      };
-    }).filter(r => r.nome);
+function UploadZone({bankCode,onData,hasData}){
+  const[drag,setDrag]=useState(false);
+  const ref=useRef();
+  const bank=BANKS[bankCode];
+  const parse=text=>{
+    const lines=text.trim().split("\n");
+    const header=lines[0].split(";").map(h=>h.trim().replace(/^\uFEFF/,""));
+    return lines.slice(1).map(line=>{
+      const vals=line.split(";");const o={};
+      header.forEach((h,i)=>{o[h]=vals[i]?.trim()||"";});
+      const n=s=>s?parseFloat(s.replace(/\./g,"").replace(",","."))||null:null;
+      return{nome:o.Nome||o.nome||"",isin:o.ISIN||o.isin||null,quantita:n(o["Quantità"]||o.quantita),prezzoCarico:n(o.Prezzo_Carico||o.prezzo_carico),controvaloreAttuale:n(o.Prezzo_Attuale||o.prezzo_attuale),categoria:o.Categoria||o.categoria||"Altro",banca:bankCode,plusMinus:null,rendimentoAnnuo:null};
+    }).filter(r=>r.nome);
   };
-
-  const handleFile = file => {
-    const reader = new FileReader();
-    reader.onload = e => { try { onData(parse(e.target.result)); } catch { alert("Errore CSV"); } };
-    reader.readAsText(file, "UTF-8");
-  };
-
-  return (
-    <div onClick={() => !hasData && ref.current?.click()}
-      onDragOver={e => { e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }}
-      style={{ border: `1.5px dashed ${hasData || dragging ? bank.color : "#444"}`, borderRadius: 10,
-        padding: 14, cursor: hasData ? "default" : "pointer",
-        background: hasData ? `${bank.color}15` : dragging ? `${bank.color}08` : "transparent",
-        display: "flex", alignItems: "center", gap: 10, transition: "all .2s" }}>
-      <div style={{ width: 34, height: 34, borderRadius: "50%", background: hasData ? bank.color : "#2a2a3e",
-        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <span style={{ color: hasData ? "white" : "#888", fontSize: 16 }}>{hasData ? "✓" : "↑"}</span>
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 500, fontSize: 13 }}>{bank.name}</div>
-        <div style={{ fontSize: 12, color: "#888" }}>{hasData ? "File caricato ✓" : "Carica CSV"}</div>
-      </div>
-      {!hasData && <input ref={ref} type="file" accept=".csv" style={{ display: "none" }}
-        onChange={e => handleFile(e.target.files[0])} />}
+  const handleFile=f=>{const r=new FileReader();r.onload=e=>{try{onData(parse(e.target.result));}catch{alert("Errore CSV");}};r.readAsText(f,"UTF-8");};
+  return(<div onClick={()=>!hasData&&ref.current?.click()} onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);handleFile(e.dataTransfer.files[0]);}} style={{border:`1.5px dashed ${hasData||drag?bank.color:"#444"}`,borderRadius:10,padding:14,cursor:hasData?"default":"pointer",background:hasData?`${bank.color}15`:drag?`${bank.color}08`:"transparent",display:"flex",alignItems:"center",gap:10}}>
+    <div style={{width:34,height:34,borderRadius:"50%",background:hasData?bank.color:"#2a2a3e",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+      <span style={{color:hasData?"white":"#888",fontSize:16}}>{hasData?"✓":"↑"}</span>
     </div>
-  );
+    <div style={{flex:1}}><div style={{fontWeight:500,fontSize:13}}>{bank.name}</div><div style={{fontSize:12,color:"#888"}}>{hasData?"Caricato ✓":"Carica CSV"}</div></div>
+    {!hasData&&<input ref={ref} type="file" accept=".csv" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>}
+  </div>);
 }
 
-function LiveBanner({ liveData, baseTotal }) {
-  const { loading, lastUpdate, error, refresh, totalStimato } = liveData;
-  const varEur = totalStimato - baseTotal;
-  const varPct = baseTotal > 0 ? (varEur / baseTotal) * 100 : 0;
-  return (
-    <div style={{ background: "#1e2235", borderRadius: 10, padding: "12px 16px",
-      marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-      <div style={{ flex: 1, minWidth: 180 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontWeight: 500, fontSize: 14 }}>{lastUpdate ? "Stima valore attuale" : "Prezzi live (benchmark)"}</span>
-          {lastUpdate && <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "#EF9F2720", color: "#EF9F27", fontWeight: 600 }}>STIMA</span>}
-        </div>
-        {lastUpdate ? (
-          <div style={{ display: "flex", gap: 12, marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 20, fontWeight: 500 }}>{fmtEur(totalStimato)}</span>
-            <span style={{ fontSize: 13, color: varPct >= 0 ? "#1D9E75" : "#D85A30" }}>
-              {varPct >= 0 ? "+" : ""}{fmt(varPct)}% ({varPct >= 0 ? "+" : ""}{fmtEur(varEur)}) dal {DATA_RIF}
-            </span>
-          </div>
-        ) : (
-          <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>Stima basata su benchmark dal {DATA_RIF}</div>
-        )}
-        {error && <div style={{ fontSize: 11, color: "#EF9F27", marginTop: 3 }}>{error}</div>}
-        <div style={{ fontSize: 10, color: "#666", marginTop: 4, fontStyle: "italic" }}>
-          ⚠ Valore stimato — non riflette il NAV reale dei fondi.
-        </div>
-      </div>
-      <button onClick={refresh} disabled={loading} style={{
-        padding: "8px 14px", borderRadius: 8, border: "0.5px solid #444",
-        background: "#2a2a3e", color: "white", cursor: loading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 500 }}>
-        {loading ? "Aggiornamento…" : lastUpdate ? `↻ ${lastUpdate.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}` : "Carica prezzi live"}
-      </button>
+function DashboardTab({all,totalValue,totalPL,totalPLpct,byBank,catData,live}){
+  const{lastUpdate,totalStimato}=live;
+  const C=(label,value,sub,color)=>(<div style={{background:"#1e2235",borderRadius:10,padding:"12px 14px"}}>
+    <div style={{fontSize:11,color:"#888",marginBottom:3}}>{label}</div>
+    <div style={{fontSize:18,fontWeight:500,color:color||"white"}}>{value}</div>
+    <div style={{fontSize:11,color:"#888",marginTop:2}}>{sub}</div>
+  </div>);
+  return(<>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:"1.25rem"}}>
+      {C(lastUpdate?"Stima oggi":`Valore al ${DATA_RIF}`,lastUpdate?fmtEur(totalStimato):fmtEur(totalValue),lastUpdate?<span style={{color:(totalStimato-totalValue)>=0?"#1D9E75":"#D85A30"}}>{(totalStimato-totalValue)>=0?"+":""}{fmtEur(totalStimato-totalValue)}</span>:`${all.length} strumenti`)}
+      {C("Plus/Minus acquisto",fmtEur(totalPL),totalPLpct!=null?fmtPct(totalPLpct):"P&L parziale",totalPL>=0?"#1D9E75":"#D85A30")}
+      {C("Banche attive",byBank.length,byBank.map(b=>b.code).join(", "))}
     </div>
-  );
-}
-
-function DashboardTab({ allHoldings, totalValue, totalPL, totalPLpct, byBank, catData, liveData }) {
-  const { lastUpdate, totalStimato } = liveData;
-  return (
-    <>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:"1.25rem" }}>
-        {[
-          {
-            label: lastUpdate ? "Stima oggi" : `Valore al ${DATA_RIF}`,
-            value: lastUpdate ? fmtEur(totalStimato) : fmtEur(totalValue),
-            sub: lastUpdate
-              ? <span style={{ color: (totalStimato-totalValue)>=0 ? "#1D9E75" : "#D85A30" }}>
-                  {(totalStimato-totalValue)>=0?"+":""}{fmtEur(totalStimato-totalValue)} dal caricamento
-                </span>
-              : `${allHoldings.length} strumenti`,
-          },
-          { label: "Plus/Minus da acquisto", value: fmtEur(totalPL), sub: totalPLpct !== null ? fmtPct(totalPLpct) : "P&L parziale", color: totalPL >= 0 ? "#1D9E75" : "#D85A30" },
-          { label: "Banche attive", value: byBank.length.toString(), sub: byBank.map(b => b.code).join(", ") },
-        ].map((c, i) => (
-          <div key={i} style={{ background: "#1e2235", borderRadius: 10, padding: "12px 14px" }}>
-            <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>{c.label}</div>
-            <div style={{ fontSize: 18, fontWeight: 500, color: c.color ?? "white" }}>{c.value}</div>
-            <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>{c.sub}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:"1.25rem" }}>
-        {[
-          { title: "Per banca", data: byBank.map(b => ({ value: b.value, color: b.color, label: b.name })) },
-          { title: "Asset allocation", data: catData.map(c => ({ value: c.value, color: c.color, label: c.label })) },
-        ].map((chart, ci) => (
-          <div key={ci} style={{ background: "#1e2235", borderRadius: 10, padding: "1rem 1.25rem" }}>
-            <div style={{ fontWeight: 500, fontSize: 14, marginBottom: "1rem" }}>{chart.title}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-              <PieChart data={chart.data} size={110} />
-              <div style={{ flex: 1 }}>
-                {chart.data.slice(0, 5).map((d, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: d.color, flexShrink: 0 }} />
-                    <div style={{ flex: 1, fontSize: 12, color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.label}</div>
-                    <div style={{ fontSize: 12, fontWeight: 500 }}>{totalValue > 0 ? Math.round(d.value/totalValue*100)+"%" : "—"}</div>
-                  </div>
-                ))}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:"1.25rem"}}>
+      {[{title:"Per banca",data:byBank.map(b=>({value:b.value,color:b.color,label:b.name}))},{title:"Asset allocation",data:catData.map(c=>({value:c.value,color:c.color,label:c.label}))}].map((ch,ci)=>(
+        <div key={ci} style={{background:"#1e2235",borderRadius:10,padding:"1rem"}}>
+          <div style={{fontWeight:500,fontSize:13,marginBottom:"1rem"}}>{ch.title}</div>
+          <div style={{display:"flex",alignItems:"center",gap:"1rem"}}>
+            <PieChart data={ch.data}/>
+            <div style={{flex:1}}>{ch.data.slice(0,5).map((d,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
+                <div style={{width:7,height:7,borderRadius:"50%",background:d.color,flexShrink:0}}/>
+                <div style={{flex:1,fontSize:11,color:"#aaa",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.label}</div>
+                <div style={{fontSize:11,fontWeight:500}}>{totalValue>0?Math.round(d.value/totalValue*100)+"%":"—"}</div>
               </div>
-            </div>
+            ))}{ch.data.length>5&&<div style={{fontSize:11,color:"#666"}}>+{ch.data.length-5} altre</div>}</div>
           </div>
-        ))}
+        </div>
+      ))}
+    </div>
+    <div style={{background:"#1e2235",borderRadius:10,padding:"1rem"}}>
+      <div style={{fontWeight:500,fontSize:13,marginBottom:"1rem"}}>Top 5 posizioni</div>
+      <table style={{width:"100%",fontSize:12}}>
+        <thead><tr>{["Titolo","Banca","Valore","P&L","%"].map(h=><th key={h} style={{textAlign:h==="Titolo"?"left":"right",padding:"4px 6px",color:"#888",fontWeight:500,borderBottom:"0.5px solid #333"}}>{h}</th>)}</tr></thead>
+        <tbody>{[...all].sort((a,b)=>(b.controvaloreAttuale||0)-(a.controvaloreAttuale||0)).slice(0,5).map((h,i)=>(
+          <tr key={i}>
+            <td style={{padding:"5px 6px",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.nome}</td>
+            <td style={{padding:"5px 6px",textAlign:"right"}}><span style={{padding:"2px 5px",borderRadius:4,fontSize:10,background:`${BANKS[h.banca]?.color}25`,color:BANKS[h.banca]?.color}}>{h.banca}</span></td>
+            <td style={{padding:"5px 6px",textAlign:"right",fontWeight:500}}>{fmtEur(h.controvaloreAttuale)}</td>
+            <td style={{padding:"5px 6px",textAlign:"right",color:h.plusMinus>0?"#1D9E75":h.plusMinus<0?"#D85A30":"#888"}}>{fmtEur(h.plusMinus)}</td>
+            <td style={{padding:"5px 6px",textAlign:"right",color:h.rendimentoAnnuo>0?"#1D9E75":h.rendimentoAnnuo<0?"#D85A30":"#888"}}>{fmtPct(h.rendimentoAnnuo)}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+    </div>
+  </>);
+}
+
+function TitoliTab({filtered,sortCol,sortDir,handleSort,fBank,setFBank,fCat,setFCat,search,setSearch,categories,live,totalValue}){
+  const[mobile,setMobile]=useState(window.innerWidth<768);
+  useEffect(()=>{const h=()=>setMobile(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
+  const SI=({col})=><span style={{opacity:sortCol===col?1:0.3,fontSize:10,marginLeft:3}}>{sortCol===col?(sortDir==="asc"?"↑":"↓"):"↕"}</span>;
+  const totCV=filtered.reduce((s,h)=>s+(h.controvaloreAttuale||0),0);
+  const totPL=filtered.reduce((s,h)=>s+(h.plusMinus||0),0);
+  return(<div>
+    <div style={{display:"flex",gap:8,marginBottom:"1rem",flexWrap:"wrap"}}>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cerca…" style={{flex:1,minWidth:130,padding:"7px 10px",borderRadius:8,border:"0.5px solid #444",background:"#1e2235",color:"white",fontSize:13}}/>
+      <select value={fBank} onChange={e=>setFBank(e.target.value)} style={{padding:"7px 10px",borderRadius:8,border:"0.5px solid #444",background:"#1e2235",color:"white",fontSize:13}}>
+        <option value="all">Tutte le banche</option>
+        {Object.entries(BANKS).map(([k,v])=><option key={k} value={k}>{v.name}</option>)}
+      </select>
+      <select value={fCat} onChange={e=>setFCat(e.target.value)} style={{padding:"7px 10px",borderRadius:8,border:"0.5px solid #444",background:"#1e2235",color:"white",fontSize:13}}>
+        <option value="all">Tutte le categorie</option>
+        {categories.map(c=><option key={c} value={c}>{c}</option>)}
+      </select>
+    </div>
+    <div style={{display:"flex",gap:12,marginBottom:"1rem"}}>
+      <span style={{fontSize:13,color:"#888"}}>{filtered.length} titoli</span>
+      <span style={{fontSize:13,fontWeight:500}}>{fmtEur(totCV)}</span>
+      {totPL!==0&&<span style={{fontSize:13,color:totPL>=0?"#1D9E75":"#D85A30"}}>{totPL>=0?"+":""}{fmtEur(totPL)}</span>}
+    </div>
+    {mobile?(
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {filtered.map((h,i)=>{
+          const e=live.enriched.find(x=>x.nome===h.nome);
+          const bank=BANKS[h.banca];
+          return(<div key={i} style={{background:"#1e2235",borderRadius:10,padding:14,borderLeft:`3px solid ${bank?.color||"#444"}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+              <div style={{fontSize:14,fontWeight:500,flex:1,marginRight:8,lineHeight:1.4}}>{h.nome}</div>
+              <span style={{padding:"2px 7px",borderRadius:4,fontSize:11,background:`${bank?.color}25`,color:bank?.color,fontWeight:500,flexShrink:0}}>{h.banca}</span>
+            </div>
+            <div style={{fontSize:11,color:"#888",marginBottom:10}}>{h.categoria}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"7px 14px"}}>
+              <div><div style={{fontSize:11,color:"#888",marginBottom:2}}>Controvalore</div><div style={{fontSize:15,fontWeight:500}}>{fmtEur(h.controvaloreAttuale)}</div></div>
+              {e?.stimato!=null&&<div><div style={{fontSize:11,color:"#EF9F27",marginBottom:2}}>Stima oggi ⚠</div><div style={{fontSize:14,fontWeight:500,color:e.stimato>=h.controvaloreAttuale?"#1D9E75":"#D85A30"}}>{fmtEur(e.stimato)}</div></div>}
+              <div><div style={{fontSize:11,color:"#888",marginBottom:2}}>P&L</div><div style={{fontSize:13,color:h.plusMinus>0?"#1D9E75":h.plusMinus<0?"#D85A30":"#888"}}>{fmtEur(h.plusMinus)}</div></div>
+              <div><div style={{fontSize:11,color:"#888",marginBottom:2}}>Rendimento</div><div style={{fontSize:13,color:h.rendimentoAnnuo>0?"#1D9E75":h.rendimentoAnnuo<0?"#D85A30":"#888"}}>{fmtPct(h.rendimentoAnnuo)}</div></div>
+              <div><div style={{fontSize:11,color:"#888",marginBottom:2}}>Quote</div><div style={{fontSize:12}}>{h.quantita!=null?fmt(h.quantita):"—"}</div></div>
+              <div><div style={{fontSize:11,color:"#888",marginBottom:2}}>P.Carico</div><div style={{fontSize:12}}>{h.prezzoCarico!=null?fmt(h.prezzoCarico,3):"—"}</div></div>
+            </div>
+            {h.isin&&<div style={{fontSize:10,color:"#555",marginTop:8}}>ISIN: {h.isin}</div>}
+          </div>);
+        })}
+        {!filtered.length&&<div style={{padding:"2rem",textAlign:"center",color:"#555"}}>Nessun risultato</div>}
       </div>
-      <div style={{ background: "#1e2235", borderRadius: 10, padding: "1rem 1.25rem" }}>
-        <div style={{ fontWeight: 500, fontSize: 14, marginBottom: "1rem" }}>Top 5 posizioni</div>
-        <table style={{ width: "100%", fontSize: 13 }}>
-          <thead><tr>{["Titolo","Banca","Valore","P&L","%"].map(h => (
-            <th key={h} style={{ textAlign: h==="Titolo"?"left":"right", padding: "4px 8px", color: "#888", fontWeight: 500, borderBottom: "0.5px solid #333" }}>{h}</th>
-          ))}</tr></thead>
-          <tbody>
-            {[...allHoldings].sort((a,b)=>(b.controvaloreAttuale||0)-(a.controvaloreAttuale||0)).slice(0,5).map((h,i) => (
-              <tr key={i}>
-                <td style={{ padding:"6px 8px", maxWidth:200, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{h.nome}</td>
-                <td style={{ padding:"6px 8px", textAlign:"right" }}>
-                  <span style={{ padding:"2px 6px", borderRadius:4, fontSize:11, background:`${BANKS[h.banca]?.color}25`, color:BANKS[h.banca]?.color }}>{h.banca}</span>
-                </td>
-                <td style={{ padding:"6px 8px", textAlign:"right", fontWeight:500 }}>{fmtEur(h.controvaloreAttuale)}</td>
-                <td style={{ padding:"6px 8px", textAlign:"right", color:h.plusMinus>0?"#1D9E75":h.plusMinus<0?"#D85A30":"#888" }}>{fmtEur(h.plusMinus)}</td>
-                <td style={{ padding:"6px 8px", textAlign:"right", color:h.rendimentoAnnuo>0?"#1D9E75":h.rendimentoAnnuo<0?"#D85A30":"#888" }}>{fmtPct(h.rendimentoAnnuo)}</td>
-              </tr>
+    ):(
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",fontSize:12}}>
+          <thead><tr style={{borderBottom:"0.5px solid #333"}}>
+            {[{l:"Titolo",c:"nome"},{l:"Banca",c:"banca"},{l:"Categoria",c:"categoria"},{l:"Quote",c:"quantita"},{l:"P.Carico",c:"prezzoCarico"},{l:"Controvalore",c:"controvaloreAttuale"},{l:"Stima ⚠",c:"stimato"},{l:"P&L",c:"plusMinus"},{l:"Rend.",c:"rendimentoAnnuo"}].map(({l,c})=>(
+              <th key={c} onClick={()=>c!=="stimato"&&handleSort(c)} style={{textAlign:["nome","banca","categoria"].includes(c)?"left":"right",padding:"6px 7px",color:c==="stimato"?"#EF9F27":"#888",fontWeight:500,cursor:c!=="stimato"?"pointer":"default",whiteSpace:"nowrap"}}>
+                {l}{c!=="stimato"&&<SI col={c}/>}
+              </th>
             ))}
-          </tbody>
+          </tr></thead>
+          <tbody>{filtered.map((h,i)=>{
+            const e=live.enriched.find(x=>x.nome===h.nome);
+            return(<tr key={i} style={{borderBottom:"0.5px solid #222"}}>
+              <td style={{padding:"6px 7px",maxWidth:170,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={h.nome}>{h.nome}</td>
+              <td style={{padding:"6px 7px"}}><span style={{padding:"2px 5px",borderRadius:4,fontSize:10,background:`${BANKS[h.banca]?.color}25`,color:BANKS[h.banca]?.color,fontWeight:500}}>{h.banca}</span></td>
+              <td style={{padding:"6px 7px",color:"#888",fontSize:11}}>{h.categoria}</td>
+              <td style={{padding:"6px 7px",textAlign:"right"}}>{h.quantita!=null?fmt(h.quantita):"—"}</td>
+              <td style={{padding:"6px 7px",textAlign:"right"}}>{h.prezzoCarico!=null?fmt(h.prezzoCarico,3):"—"}</td>
+              <td style={{padding:"6px 7px",textAlign:"right",fontWeight:500}}>{fmtEur(h.controvaloreAttuale)}</td>
+              <td style={{padding:"6px 7px",textAlign:"right"}}>{e?.stimato!=null?<span><span style={{fontWeight:500,color:e.stimato>=h.controvaloreAttuale?"#1D9E75":"#D85A30"}}>{fmtEur(e.stimato)}</span><span style={{fontSize:10,color:"#888",marginLeft:3}}>({e.varPct>=0?"+":""}{fmt(e.varPct)}%)</span></span>:<span style={{color:"#555"}}>{live.lastUpdate?"n/d":"—"}</span>}</td>
+              <td style={{padding:"6px 7px",textAlign:"right",color:h.plusMinus>0?"#1D9E75":h.plusMinus<0?"#D85A30":"#888"}}>{fmtEur(h.plusMinus)}</td>
+              <td style={{padding:"6px 7px",textAlign:"right",color:h.rendimentoAnnuo>0?"#1D9E75":h.rendimentoAnnuo<0?"#D85A30":"#888"}}>{fmtPct(h.rendimentoAnnuo)}</td>
+            </tr>);
+          })}</tbody>
+          <tfoot><tr style={{borderTop:"0.5px solid #333",fontWeight:500}}>
+            <td colSpan={5} style={{padding:"6px 7px",color:"#888",fontSize:11}}>{filtered.length} titoli</td>
+            <td style={{padding:"6px 7px",textAlign:"right"}}>{fmtEur(totCV)}</td>
+            <td style={{padding:"6px 7px",textAlign:"right",color:"#EF9F27",fontSize:11}}>{live.lastUpdate?fmtEur(filtered.reduce((s,h)=>{const e=live.enriched.find(x=>x.nome===h.nome);return s+(e?.stimato??h.controvaloreAttuale??0);},0)):"—"}</td>
+            <td style={{padding:"6px 7px",textAlign:"right",color:totPL>=0?"#1D9E75":"#D85A30"}}>{fmtEur(totPL)}</td>
+            <td/>
+          </tr></tfoot>
         </table>
       </div>
-    </>
-  );
+    )}
+    {live.lastUpdate&&<div style={{fontSize:11,color:"#EF9F27",marginTop:8,fontStyle:"italic"}}>⚠ Stima basata su benchmark. Non riflette il NAV reale.</div>}
+  </div>);
 }
 
-function TitoliTab({ filteredHoldings, sortCol, sortDir, handleSort, filterBank, setFilterBank, filterCat, setFilterCat, search, setSearch, categories, liveData, totalValue }) {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  React.useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
-  }, []);
-
-  const SortIcon = ({ col }) => (
-    <span style={{ opacity: sortCol===col?1:0.3, fontSize:10, marginLeft:3 }}>
-      {sortCol===col?(sortDir==="asc"?"↑":"↓"):"↕"}
-    </span>
-  );
-
-  const totalCV = filteredHoldings.reduce((s,h)=>s+(h.controvaloreAttuale||0),0);
-  const totalPL = filteredHoldings.reduce((s,h)=>s+(h.plusMinus||0),0);
-
-  return (
-    <div>
-      {/* Filtri */}
-      <div style={{ display:"flex", gap:10, marginBottom:"1rem", flexWrap:"wrap" }}>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cerca titolo…"
-          style={{ flex:1, minWidth:140, padding:"8px 10px", borderRadius:8, border:"0.5px solid #444", background:"#1e2235", color:"white", fontSize:13 }} />
-        <select value={filterBank} onChange={e=>setFilterBank(e.target.value)}
-          style={{ padding:"8px 10px", borderRadius:8, border:"0.5px solid #444", background:"#1e2235", color:"white", fontSize:13 }}>
-          <option value="all">Tutte le banche</option>
-          {Object.entries(BANKS).map(([k,v]) => <option key={k} value={k}>{v.name}</option>)}
-        </select>
-        <select value={filterCat} onChange={e=>setFilterCat(e.target.value)}
-          style={{ padding:"8px 10px", borderRadius:8, border:"0.5px solid #444", background:"#1e2235", color:"white", fontSize:13 }}>
-          <option value="all">Tutte le categorie</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-
-      {/* Riepilogo totali */}
-      <div style={{ display:"flex", gap:12, marginBottom:"1rem", flexWrap:"wrap" }}>
-        <div style={{ fontSize:13, color:"#888" }}>{filteredHoldings.length} titoli</div>
-        <div style={{ fontSize:13, fontWeight:500 }}>{fmtEur(totalCV)}</div>
-        {totalPL !== 0 && <div style={{ fontSize:13, color:totalPL>=0?"#1D9E75":"#D85A30" }}>{totalPL>=0?"+":""}{fmtEur(totalPL)}</div>}
-      </div>
-
-      {/* MOBILE: card verticali */}
-      {isMobile ? (
-        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {filteredHoldings.map((h,i) => {
-            const e = liveData.enriched.find(x=>x.nome===h.nome);
-            const bank = BANKS[h.banca];
-            return (
-              <div key={i} style={{ background:"#1e2235", borderRadius:10, padding:"14px", borderLeft:`3px solid ${bank?.color||"#444"}` }}>
-                {/* Nome + banca */}
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
-                  <div style={{ fontSize:14, fontWeight:500, flex:1, marginRight:8, lineHeight:1.4 }}>{h.nome}</div>
-                  <span style={{ padding:"2px 8px", borderRadius:4, fontSize:11, background:`${bank?.color}25`, color:bank?.color, fontWeight:500, flexShrink:0 }}>{h.banca}</span>
-                </div>
-                {/* Categoria */}
-                <div style={{ fontSize:12, color:"#888", marginBottom:12 }}>{h.categoria}</div>
-                {/* Valori in griglia 2 colonne */}
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px 16px" }}>
-                  <div>
-                    <div style={{ fontSize:11, color:"#888", marginBottom:2 }}>Controvalore</div>
-                    <div style={{ fontSize:15, fontWeight:500 }}>{fmtEur(h.controvaloreAttuale)}</div>
-                  </div>
-                  {e?.stimato!=null && (
-                    <div>
-                      <div style={{ fontSize:11, color:"#EF9F27", marginBottom:2 }}>Stima oggi ⚠</div>
-                      <div style={{ fontSize:15, fontWeight:500, color:e.stimato>=h.controvaloreAttuale?"#1D9E75":"#D85A30" }}>
-                        {fmtEur(e.stimato)}
-                        <span style={{ fontSize:11, color:"#888", marginLeft:4 }}>({e.varPct>=0?"+":""}{fmt(e.varPct)}%)</span>
-                      </div>
-                    </div>
-                  )}
-                  <div>
-                    <div style={{ fontSize:11, color:"#888", marginBottom:2 }}>P&L</div>
-                    <div style={{ fontSize:14, color:h.plusMinus>0?"#1D9E75":h.plusMinus<0?"#D85A30":"#888" }}>{fmtEur(h.plusMinus)}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize:11, color:"#888", marginBottom:2 }}>Rend. annuo</div>
-                    <div style={{ fontSize:14, color:h.rendimentoAnnuo>0?"#1D9E75":h.rendimentoAnnuo<0?"#D85A30":"#888" }}>{fmtPct(h.rendimentoAnnuo)}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize:11, color:"#888", marginBottom:2 }}>Quote</div>
-                    <div style={{ fontSize:13 }}>{h.quantita!=null?fmt(h.quantita):"—"}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize:11, color:"#888", marginBottom:2 }}>Prezzo carico</div>
-                    <div style={{ fontSize:13 }}>{h.prezzoCarico!=null?fmt(h.prezzoCarico,3):"—"}</div>
-                  </div>
-                </div>
-                {h.isin && <div style={{ fontSize:10, color:"#555", marginTop:10 }}>ISIN: {h.isin}</div>}
-              </div>
-            );
-          })}
-          {filteredHoldings.length === 0 && (
-            <div style={{ padding:"2rem", textAlign:"center", color:"#555" }}>Nessun risultato</div>
-          )}
+function AnalisiTab({holdings,totalValue,byCat,catData}){
+  const[analysis,setAnalysis]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[done,setDone]=useState(false);
+  const[storico,setStorico]=useState(()=>{try{return JSON.parse(localStorage.getItem("portfolio_analisi")||"[]");}catch{return[];}});
+  const[viewIdx,setViewIdx]=useState(null);
+  const saveS=text=>{const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),totale:fmtEur(totalValue),testo:text};const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_analisi",JSON.stringify(u));};
+  const delE=id=>{const u=storico.filter(e=>e.id!==id);setStorico(u);localStorage.setItem("portfolio_analisi",JSON.stringify(u));setViewIdx(null);};
+  const delAll=()=>{setStorico([]);localStorage.removeItem("portfolio_analisi");setViewIdx(null);};
+  const run=async()=>{
+    setLoading(true);setAnalysis("");setDone(false);setViewIdx(null);
+    const summary=holdings.filter(h=>h.controvaloreAttuale>0).map(h=>`${h.nome.slice(0,35)} [${h.banca}] (${h.categoria}): ${fmtEur(h.controvaloreAttuale)}`).join("\n");
+    try{
+      const text=await callAI(null,`Sei un consulente finanziario italiano esperto. Analizza questo portafoglio BILANCIATO (totale ${fmtEur(totalValue)}):\n${summary}\n\nFornisci:\n1. **Valutazione generale**\n2. **Rischi principali** (3 punti)\n3. **Opportunità** (3 punti)\n4. **Raccomandazioni** per profilo bilanciato\n5. **Previsione 2026**`);
+      if(!text||!text.trim())throw new Error("Risposta vuota");
+      setAnalysis(text);saveS(text);setDone(true);
+    }catch(e){setAnalysis(`⚠ Errore: ${e.message}`);setDone(false);}
+    setLoading(false);
+  };
+  const renderMd=t=>t.replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<br/>");
+  const az=Object.entries(byCat).filter(([k])=>k.toLowerCase().startsWith("azion")).reduce((s,[,v])=>s+v,0);
+  const ob=Object.entries(byCat).filter(([k])=>k.toLowerCase().startsWith("obblig")).reduce((s,[,v])=>s+v,0);
+  const ass=Object.entries(byCat).filter(([k])=>k.toLowerCase().includes("assicur")).reduce((s,[,v])=>s+v,0);
+  const pAz=totalValue>0?Math.round(az/totalValue*100):0;
+  const pOb=totalValue>0?Math.round(ob/totalValue*100):0;
+  const pAs=totalValue>0?Math.round(ass/totalValue*100):0;
+  const testo=viewIdx!==null?storico[viewIdx]?.testo:analysis;
+  return(<div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:"1.25rem"}}>
+      {[{l:"Azionario",v:pAz+"%",s:"target 50–65%",a:pAz>65||pAz<50},{l:"Obbligazionario",v:pOb+"%",s:"target 30–45%",a:pOb>45||pOb<30},{l:"Assicurativo",v:pAs+"%",s:"polizze/unit linked",a:false},{l:"Titoli",v:holdings.filter(h=>h.controvaloreAttuale>0).length,s:fmtEur(totalValue),a:false}].map((c,i)=>(
+        <div key={i} style={{background:c.a?"#EF9F2710":"#1e2235",border:c.a?"0.5px solid #EF9F2740":"none",borderRadius:10,padding:"12px 14px"}}>
+          <div style={{fontSize:11,color:"#888",marginBottom:3}}>{c.l}</div>
+          <div style={{fontSize:20,fontWeight:500,color:c.a?"#EF9F27":"white"}}>{c.v}</div>
+          <div style={{fontSize:11,color:"#888",marginTop:2}}>{c.s}</div>
         </div>
-      ) : (
-        /* DESKTOP: tabella normale */
-        <div style={{ overflowX:"auto" }}>
-          <table style={{ width:"100%", fontSize:12.5 }}>
-            <thead><tr style={{ borderBottom:"0.5px solid #333" }}>
-              {[{l:"Titolo",c:"nome"},{l:"Banca",c:"banca"},{l:"Categoria",c:"categoria"},
-                {l:"Quote",c:"quantita"},{l:"P.Carico",c:"prezzoCarico"},
-                {l:"Controvalore",c:"controvaloreAttuale"},{l:"Stima oggi ⚠",c:"stimato"},
-                {l:"P&L €",c:"plusMinus"},{l:"Rend.%",c:"rendimentoAnnuo"}
-              ].map(({l,c}) => (
-                <th key={c} onClick={()=>c!=="stimato"&&handleSort(c)}
-                  style={{ textAlign:["nome","banca","categoria"].includes(c)?"left":"right",
-                    padding:"7px 8px", color:c==="stimato"?"#EF9F27":"#888",
-                    fontWeight:500, cursor:c!=="stimato"?"pointer":"default", whiteSpace:"nowrap" }}>
-                  {l}{c!=="stimato"&&<SortIcon col={c} />}
-                </th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {filteredHoldings.map((h,i) => {
-                const e = liveData.enriched.find(x=>x.nome===h.nome);
-                return (
-                  <tr key={i} style={{ borderBottom:"0.5px solid #222" }}>
-                    <td style={{ padding:"7px 8px", maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }} title={h.nome}>{h.nome}</td>
-                    <td style={{ padding:"7px 8px" }}>
-                      <span style={{ padding:"2px 6px", borderRadius:4, fontSize:11, background:`${BANKS[h.banca]?.color}25`, color:BANKS[h.banca]?.color, fontWeight:500 }}>{h.banca}</span>
-                    </td>
-                    <td style={{ padding:"7px 8px", color:"#888", fontSize:11 }}>{h.categoria}</td>
-                    <td style={{ padding:"7px 8px", textAlign:"right" }}>{h.quantita!=null?fmt(h.quantita):"—"}</td>
-                    <td style={{ padding:"7px 8px", textAlign:"right" }}>{h.prezzoCarico!=null?fmt(h.prezzoCarico,3):"—"}</td>
-                    <td style={{ padding:"7px 8px", textAlign:"right", fontWeight:500 }}>{fmtEur(h.controvaloreAttuale)}</td>
-                    <td style={{ padding:"7px 8px", textAlign:"right" }}>
-                      {e?.stimato!=null?(
-                        <span>
-                          <span style={{ fontWeight:500, color:e.stimato>=h.controvaloreAttuale?"#1D9E75":"#D85A30" }}>{fmtEur(e.stimato)}</span>
-                          <span style={{ fontSize:10, color:"#888", marginLeft:3 }}>({e.varPct>=0?"+":""}{fmt(e.varPct)}%)</span>
-                        </span>
-                      ):<span style={{ color:"#555" }}>{liveData.lastUpdate?"n/d":"—"}</span>}
-                    </td>
-                    <td style={{ padding:"7px 8px", textAlign:"right", color:h.plusMinus>0?"#1D9E75":h.plusMinus<0?"#D85A30":"#888" }}>{fmtEur(h.plusMinus)}</td>
-                    <td style={{ padding:"7px 8px", textAlign:"right", color:h.rendimentoAnnuo>0?"#1D9E75":h.rendimentoAnnuo<0?"#D85A30":"#888" }}>{fmtPct(h.rendimentoAnnuo)}</td>
-                  </tr>
-                );
-              })}
-              {filteredHoldings.length === 0 && (
-                <tr><td colSpan={9} style={{ padding:"2rem", textAlign:"center", color:"#555" }}>Nessun risultato</td></tr>
-              )}
-            </tbody>
-            <tfoot><tr style={{ borderTop:"0.5px solid #333", fontWeight:500 }}>
-              <td colSpan={5} style={{ padding:"7px 8px", color:"#888", fontSize:12 }}>{filteredHoldings.length} titoli</td>
-              <td style={{ padding:"7px 8px", textAlign:"right" }}>{fmtEur(totalCV)}</td>
-              <td style={{ padding:"7px 8px", textAlign:"right", color:"#EF9F27", fontSize:12 }}>
-                {liveData.lastUpdate?fmtEur(filteredHoldings.reduce((s,h)=>{const e=liveData.enriched.find(x=>x.nome===h.nome);return s+(e?.stimato??h.controvaloreAttuale??0);},0)):"—"}
-              </td>
-              <td style={{ padding:"7px 8px", textAlign:"right", color:totalPL>=0?"#1D9E75":"#D85A30" }}>{fmtEur(totalPL)}</td>
-              <td/>
-            </tr></tfoot>
+      ))}
+    </div>
+    <div style={{background:"#1e2235",borderRadius:10,padding:"1.25rem",marginBottom:"1rem"}}>
+      <div style={{fontWeight:500,fontSize:13,marginBottom:"1rem"}}>Distribuzione per categoria</div>
+      {catData.map(c=>(<div key={c.label} style={{marginBottom:9}}>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
+          <span style={{color:"#ccc"}}>{c.label}</span>
+          <span style={{fontWeight:500}}>{totalValue>0?Math.round(c.value/totalValue*100):0}%</span>
+        </div>
+        <div style={{height:5,borderRadius:3,background:"#2a2a3e"}}><div style={{height:"100%",borderRadius:3,background:c.color,width:totalValue>0?`${c.value/totalValue*100}%`:"0%",transition:"width .5s"}}/></div>
+      </div>))}
+    </div>
+    <div style={{background:"#1e2235",borderRadius:10,padding:"1.25rem",marginBottom:"1rem"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:testo?"1rem":0}}>
+        <div><div style={{fontWeight:500,fontSize:14}}>Analisi AI</div><div style={{fontSize:11,color:"#888"}}>powered by Gemini</div></div>
+        <button onClick={run} disabled={loading} style={{padding:"8px 14px",borderRadius:8,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:loading?"not-allowed":"pointer",fontSize:13,fontWeight:500}}>{loading?"In corso…":done?"Rigenera":"Avvia analisi"}</button>
+      </div>
+      {viewIdx!==null&&<div style={{fontSize:11,color:"#888",marginBottom:8,fontStyle:"italic"}}>📅 {storico[viewIdx]?.data} · {storico[viewIdx]?.totale}</div>}
+      {testo&&<div style={{fontSize:13,lineHeight:1.7}} dangerouslySetInnerHTML={{__html:renderMd(testo)}}/>}
+      {!testo&&!loading&&<div style={{fontSize:13,color:"#888",fontStyle:"italic",marginTop:"1rem"}}>Clicca "Avvia analisi".</div>}
+    </div>
+    {storico.length>0&&(
+      <div style={{background:"#1e2235",borderRadius:10,padding:"1.25rem"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1rem"}}>
+          <div style={{fontWeight:500,fontSize:13}}>Storico ({storico.length}/5)</div>
+          <button onClick={delAll} style={{padding:"4px 10px",borderRadius:6,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>Cancella tutto</button>
+        </div>
+        {storico.map((e,i)=>(
+          <div key={e.id} onClick={()=>setViewIdx(viewIdx===i?null:i)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,marginBottom:6,background:viewIdx===i?"#2a2a3e":"#12121e",border:viewIdx===i?"0.5px solid #7F77DD":"0.5px solid #2a2a3e",cursor:"pointer"}}>
+            <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500}}>{e.data}</div><div style={{fontSize:11,color:"#888",marginTop:2}}>{e.totale} · {e.testo.slice(0,60)}…</div></div>
+            <button onClick={ev=>{ev.stopPropagation();delE(e.id);}} style={{padding:"3px 8px",borderRadius:6,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:11,flexShrink:0}}>✕</button>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>);
+}
+
+function PrevisioniTab({holdings,totalValue}){
+  const[scenarios,setScenarios]=useState(null);
+  const[loading,setLoading]=useState(false);
+  const[perTitolo,setPerTitolo]=useState([]);
+  const rendP=holdings.length>0?holdings.reduce((s,h)=>s+getRend(h)*(h.controvaloreAttuale||0),0)/totalValue:0;
+  const today=new Date();
+  const months=[];for(let m=today.getMonth();m<=11;m++)months.push(["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"][m]);
+  const run=async()=>{
+    setLoading(true);setScenarios(null);
+    const catBD={};holdings.forEach(h=>{catBD[h.categoria]=(catBD[h.categoria]||0)+(h.controvaloreAttuale||0);});
+    try{
+      const text=await callAI("Sei un consulente finanziario italiano. Rispondi SOLO con JSON valido, senza testo prima o dopo.",`Portafoglio bilanciato, aprile 2026. Totale €${Math.round(totalValue).toLocaleString("it-IT")}. Rendimento medio: ${rendP.toFixed(2)}%. Composizione: ${Object.entries(catBD).map(([k,v])=>`${k} ${Math.round(v/totalValue*100)}%`).join(", ")}. Contesto: tensioni USA-Cina, BCE ferma. JSON: {"contesto":"...","base":{"nome":"Scenario Base","rendimento":7.5,"motivazione":"..."},"ottimistico":{"nome":"Scenario Ottimistico","rendimento":11.0,"motivazione":"..."},"pessimistico":{"nome":"Scenario Pessimistico","rendimento":2.5,"motivazione":"..."},"raccomandazioni":["...","...","..."]}`,1200);
+      const json=extractJSON(text);
+      setScenarios(json);
+      setPerTitolo(holdings.filter(h=>h.controvaloreAttuale>0).map(h=>{const r=getRend(h);return{...h,r,v6:h.controvaloreAttuale*Math.pow(1+r/100/12,6),v12:h.controvaloreAttuale*Math.pow(1+r/100/12,12)};}).sort((a,b)=>b.controvaloreAttuale-a.controvaloreAttuale));
+    }catch(e){setScenarios({error:`Errore: ${e.message}`});}
+    setLoading(false);
+  };
+  const SC={base:"#1D9E75",ottimistico:"#7F77DD",pessimistico:"#D85A30"};
+  const proj=rate=>months.map((_,i)=>Math.round(totalValue*Math.pow(1+rate/100/12,i)));
+  return(<div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:"1.25rem"}}>
+      {[{l:"Valore oggi",v:fmtEur(totalValue),s:new Date().toLocaleDateString("it-IT")},{l:"Rend. medio",v:fmtPct(rendP),s:"ponderato"},{l:"Mesi rimanenti",v:(12-today.getMonth()).toString(),s:"fino a dicembre"}].map((c,i)=>(
+        <div key={i} style={{background:"#1e2235",borderRadius:10,padding:"12px 14px"}}>
+          <div style={{fontSize:11,color:"#888",marginBottom:3}}>{c.l}</div>
+          <div style={{fontSize:20,fontWeight:500}}>{c.v}</div>
+          <div style={{fontSize:11,color:"#888",marginTop:2}}>{c.s}</div>
+        </div>
+      ))}
+    </div>
+    {scenarios&&!scenarios.error&&(
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:"1.25rem"}}>
+        {["ottimistico","base","pessimistico"].map(key=>{
+          const s=scenarios[key],color=SC[key],val=proj(s.rendimento).at(-1);
+          return(<div key={key} style={{background:"#1e2235",borderRadius:10,padding:"12px 14px",borderLeft:`3px solid ${color}`}}>
+            <div style={{fontSize:11,color:"#888",marginBottom:3}}>{s.nome}</div>
+            <div style={{fontSize:18,fontWeight:500,color}}>{fmtEur(val)}</div>
+            <div style={{fontSize:11,color:"#888",marginTop:2}}>{s.rendimento>=0?"+":""}{s.rendimento.toFixed(1)}% · {val>totalValue?"+":""}{fmtEur(val-totalValue)}</div>
+            <div style={{fontSize:11,color:"#aaa",marginTop:4}}>{s.motivazione}</div>
+          </div>);
+        })}
+      </div>
+    )}
+    <div style={{background:"#1e2235",borderRadius:10,padding:"1.25rem",marginBottom:"1rem"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div><div style={{fontWeight:500,fontSize:14}}>Scenari AI</div><div style={{fontSize:11,color:"#888"}}>Gemini analizza il contesto</div></div>
+        <button onClick={run} disabled={loading} style={{padding:"8px 14px",borderRadius:8,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:loading?"not-allowed":"pointer",fontSize:13,fontWeight:500}}>{loading?"In corso…":scenarios?"Aggiorna":"Avvia previsione"}</button>
+      </div>
+      {scenarios?.error&&<div style={{color:"#D85A30",fontSize:13,marginTop:"1rem"}}>{scenarios.error}</div>}
+      {scenarios&&!scenarios.error&&(<div style={{marginTop:"1rem"}}>
+        <div style={{fontSize:12,color:"#888",fontStyle:"italic",marginBottom:"1rem"}}>{scenarios.contesto}</div>
+        <div style={{borderTop:"0.5px solid #2a2a3e",paddingTop:"1rem"}}>
+          <div style={{fontSize:13,fontWeight:500,marginBottom:8}}>Raccomandazioni</div>
+          {scenarios.raccomandazioni?.map((r,i)=>(
+            <div key={i} style={{display:"flex",gap:8,marginBottom:6,fontSize:13}}>
+              <span style={{color:"#1D9E75",fontWeight:500,flexShrink:0}}>{i+1}.</span>
+              <span style={{color:"#aaa"}}>{r}</span>
+            </div>
+          ))}
+        </div>
+      </div>)}
+      {!scenarios&&!loading&&<div style={{fontSize:13,color:"#888",fontStyle:"italic",marginTop:"1rem"}}>Clicca "Avvia previsione".</div>}
+    </div>
+    {perTitolo.length>0&&(
+      <div style={{background:"#1e2235",borderRadius:10,padding:"1.25rem"}}>
+        <div style={{fontWeight:500,fontSize:13,marginBottom:"1rem"}}>Stima per titolo</div>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",fontSize:12}}>
+            <thead><tr style={{borderBottom:"0.5px solid #333"}}>{["Titolo","Cat.","Oggi","Rend.","+6m","+12m"].map(h=><th key={h} style={{textAlign:["Titolo","Cat."].includes(h)?"left":"right",padding:"5px 7px",color:"#888",fontWeight:500}}>{h}</th>)}</tr></thead>
+            <tbody>{perTitolo.map((h,i)=>(
+              <tr key={i} style={{borderBottom:"0.5px solid #222"}}>
+                <td style={{padding:"6px 7px",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={h.nome}>{h.nome}</td>
+                <td style={{padding:"6px 7px",fontSize:11,color:"#888"}}>{h.categoria}</td>
+                <td style={{padding:"6px 7px",textAlign:"right"}}>{fmtEur(h.controvaloreAttuale)}</td>
+                <td style={{padding:"6px 7px",textAlign:"right",color:h.r>=0?"#1D9E75":"#D85A30"}}>{fmtPct(h.r)}</td>
+                <td style={{padding:"6px 7px",textAlign:"right",color:h.v6>=h.controvaloreAttuale?"#1D9E75":"#D85A30"}}>{fmtEur(h.v6)}</td>
+                <td style={{padding:"6px 7px",textAlign:"right",color:h.v12>=h.controvaloreAttuale?"#1D9E75":"#D85A30"}}>{fmtEur(h.v12)}</td>
+              </tr>
+            ))}</tbody>
           </table>
         </div>
-      )}
-      {liveData.lastUpdate&&<div style={{ fontSize:11, color:"#EF9F27", marginTop:8, fontStyle:"italic" }}>⚠ "Stima oggi" applica la variazione % del benchmark al controvalore del {DATA_RIF}.</div>}
-    </div>
-  );
+      </div>
+    )}
+  </div>);
 }
 
-function AnalisiTab({ allHoldings, totalValue, byCat, catData }) {
-  const [analysis, setAnalysis] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
-
-  const run = async () => {
-    setLoading(true); setAnalysis(""); setDone(false);
-    const summary = allHoldings.filter(h=>h.controvaloreAttuale>0)
-      .map(h=>`${h.nome.slice(0,35)} [${h.banca}] (${h.categoria}): ${fmtEur(h.controvaloreAttuale)}`).join("\n");
-    try {
-      const text = await callClaude(null,
-        `Sei un consulente finanziario italiano esperto. Analizza questo portafoglio BILANCIATO (totale ${fmtEur(totalValue)}):\n${summary}\n\nFornisci:\n1. **Valutazione generale**\n2. **Rischi principali** (3 punti)\n3. **Opportunità** (3 punti)\n4. **Raccomandazioni** per profilo bilanciato\n5. **Previsione 2026**`
-      );
-      setAnalysis(text); setDone(true);
-    } catch(e) { setAnalysis("Errore API."); setDone(true); }
+function AzioniTab({holdings,totalValue,byCat}){
+  const[actions,setActions]=useState(null);
+  const[loading,setLoading]=useState(false);
+  const[expanded,setExpanded]=useState(null);
+  const[filterTipo,setFilterTipo]=useState("tutti");
+  const az=Object.entries(byCat).filter(([k])=>k.toLowerCase().startsWith("azion")).reduce((s,[,v])=>s+v,0);
+  const ob=Object.entries(byCat).filter(([k])=>k.toLowerCase().startsWith("obblig")).reduce((s,[,v])=>s+v,0);
+  const pAz=totalValue>0?(az/totalValue*100).toFixed(1):0;
+  const pOb=totalValue>0?(ob/totalValue*100).toFixed(1):0;
+  const run=async()=>{
+    setLoading(true);setActions(null);setExpanded(null);
+    const righe=holdings.filter(h=>h.controvaloreAttuale>0).map((h,i)=>{
+      const nome=h.nome.length>40?h.nome.slice(0,40):h.nome;
+      const peso=totalValue>0?(h.controvaloreAttuale/totalValue*100).toFixed(1):0;
+      return `${i+1}. ${nome} [${h.banca}] | ${h.categoria} | €${Math.round(h.controvaloreAttuale)} (${peso}%) | rend:${h.rendimentoAnnuo!=null?h.rendimentoAnnuo+"%":"n/d"}`;
+    }).join("\n");
+    try{
+      const text=await callAI("Sei un consulente finanziario italiano. Rispondi SOLO con JSON valido, senza testo prima o dopo.",`Portafoglio BILANCIATO, aprile 2026. Totale €${Math.round(totalValue).toLocaleString("it-IT")}. Azionario ${pAz}% (target 50-65%), Obbligazionario ${pOb}% (target 30-45%). Contesto: tensioni USA-Cina, BCE ferma.\n\nTITOLI:\n${righe}\n\nPer ogni titolo azione (vendi/monitora/mantieni/incrementa/switch) e priorità (alta/media/bassa). JSON: {"sommario":"...","ribilanciamento":"...","titoli":[{"nome":"...","azione":"mantieni","priorita":"media","motivazione":"...","cosa_fare":"..."}]}`,4000);
+      const json=extractJSON(text);
+      if(!json.titoli||!Array.isArray(json.titoli))throw new Error("Struttura non valida");
+      setActions(json);
+    }catch(e){setActions({error:`Errore: ${e.message}`});}
     setLoading(false);
   };
-
-  const renderMd = t => t
-    .replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
-    .replace(/\n/g,"<br/>");
-
-  const az = Object.entries(byCat).filter(([k])=>k.toLowerCase().includes("azion")).reduce((s,[,v])=>s+v,0);
-  const ob = Object.entries(byCat).filter(([k])=>k.toLowerCase().includes("obblig")).reduce((s,[,v])=>s+v,0);
-
-  return (
-    <div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:"1.25rem" }}>
-        {[
-          { label:"Concentrazione MD", value:"97%", sub:"solo Mediolanum attiva", alert:true },
-          { label:"Azionario", value:totalValue>0?Math.round(az/totalValue*100)+"%":"—", sub:"target 50–65%" },
-          { label:"Obbligazionario", value:totalValue>0?Math.round(ob/totalValue*100)+"%":"—", sub:"target 30–45%" },
-        ].map((c,i) => (
-          <div key={i} style={{ background:c.alert?"#EF9F2710":"#1e2235", border:c.alert?"0.5px solid #EF9F2740":"none", borderRadius:10, padding:"14px 16px" }}>
-            <div style={{ fontSize:12, color:"#888", marginBottom:4 }}>{c.label}</div>
-            <div style={{ fontSize:22, fontWeight:500, color:c.alert?"#EF9F27":"white" }}>{c.value}</div>
-            <div style={{ fontSize:12, color:"#888", marginTop:3 }}>{c.sub}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ background:"#1e2235", borderRadius:10, padding:"1.25rem", marginBottom:"1rem" }}>
-        <div style={{ fontWeight:500, fontSize:14, marginBottom:"1rem" }}>Distribuzione per categoria</div>
-        {catData.map(c => (
-          <div key={c.label} style={{ marginBottom:10 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:13, marginBottom:4 }}>
-              <span style={{ color:"#ccc" }}>{c.label}</span>
-              <span style={{ fontWeight:500 }}>{totalValue>0?Math.round(c.value/totalValue*100):0}%</span>
-            </div>
-            <div style={{ height:6, borderRadius:3, background:"#2a2a3e" }}>
-              <div style={{ height:"100%", borderRadius:3, background:c.color, width:totalValue>0?`${c.value/totalValue*100}%`:"0%", transition:"width .5s" }} />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={{ background:"#1e2235", borderRadius:10, padding:"1.25rem" }}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:analysis?"1rem":0 }}>
-          <div>
-            <div style={{ fontWeight:500, fontSize:15 }}>Analisi AI</div>
-            <div style={{ fontSize:12, color:"#888" }}>powered by Gemini</div>
-          </div>
-          <button onClick={run} disabled={loading} style={{ padding:"8px 16px", borderRadius:8, border:"0.5px solid #444", background:"#2a2a3e", color:"white", cursor:loading?"not-allowed":"pointer", fontSize:13, fontWeight:500 }}>
-            {loading?"Analisi in corso…":done?"Rigenera":"Avvia analisi"}
-          </button>
+  const tf=actions?.titoli?.filter(t=>filterTipo==="tutti"||t.azione===filterTipo)??[];
+  const cnt=actions?.titoli?Object.keys(AZIONE_META).reduce((a,k)=>{a[k]=actions.titoli.filter(t=>t.azione===k).length;return a;},{}):{}; 
+  return(<div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:"1.25rem"}}>
+      {[{l:"Azionario",v:pAz+"%",s:"target 50–65%",a:pAz>65||pAz<50},{l:"Obbligazionario",v:pOb+"%",s:"target 30–45%",a:pOb>45||pOb<30},{l:"Titoli",v:holdings.filter(h=>h.controvaloreAttuale>0).length,s:"da analizzare",a:false}].map((c,i)=>(
+        <div key={i} style={{background:c.a?"#EF9F2710":"#1e2235",border:c.a?"0.5px solid #EF9F2740":"none",borderRadius:10,padding:"12px 14px"}}>
+          <div style={{fontSize:11,color:"#888",marginBottom:3}}>{c.l}</div>
+          <div style={{fontSize:20,fontWeight:500,color:c.a?"#EF9F27":"white"}}>{c.v}</div>
+          <div style={{fontSize:11,color:"#888",marginTop:2}}>{c.s}</div>
         </div>
-        {analysis&&<div style={{ fontSize:13.5, lineHeight:1.7, marginTop:"1rem" }} dangerouslySetInnerHTML={{ __html:renderMd(analysis) }} />}
-        {!analysis&&!loading&&<div style={{ fontSize:13, color:"#888", fontStyle:"italic", marginTop:"1rem" }}>Clicca "Avvia analisi".</div>}
-      </div>
+      ))}
     </div>
-  );
-}
-
-function PrevisioniTab({ allHoldings, totalValue }) {
-  const [scenarios, setScenarios] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [perTitolo, setPerTitolo] = useState([]);
-
-  const rendPonderato = allHoldings.length>0
-    ? allHoldings.reduce((s,h)=>s+getRendimento(h)*(h.controvaloreAttuale||0),0)/totalValue : 0;
-
-  const today = new Date();
-  const months = [];
-  for (let m=today.getMonth();m<=11;m++)
-    months.push(["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"][m]);
-
-  const project = rate => months.map((_,i)=>Math.round(totalValue*Math.pow(1+rate/100/12,i)));
-
-  const run = async () => {
-    setLoading(true); setScenarios(null);
-    const catBD={};
-    allHoldings.forEach(h=>{catBD[h.categoria]=(catBD[h.categoria]||0)+(h.controvaloreAttuale||0);});
-    try {
-      const text = await callClaude(
-        "Sei un consulente finanziario italiano. Rispondi SEMPRE e SOLO con JSON valido, senza testo prima o dopo.",
-        `Portafoglio bilanciato, aprile 2026. Totale €${Math.round(totalValue).toLocaleString("it-IT")}. Rend. medio: ${rendPonderato.toFixed(2)}%. Composizione: ${Object.entries(catBD).map(([k,v])=>`${k} ${Math.round(v/totalValue*100)}%`).join(", ")}. Contesto: tensioni USA-Cina, BCE ferma. JSON: {"contesto":"...","base":{"nome":"Scenario Base","rendimento":7.5,"motivazione":"..."},"ottimistico":{"nome":"Scenario Ottimistico","rendimento":11.0,"motivazione":"..."},"pessimistico":{"nome":"Scenario Pessimistico","rendimento":2.5,"motivazione":"..."},"raccomandazioni":["...","...","..."]}`,
-        1200
-      );
-      const json = extractJSON(text);
-      setScenarios(json);
-      setPerTitolo(allHoldings.filter(h=>h.controvaloreAttuale>0).map(h=>{
-        const r=getRendimento(h);
-        return {...h,r,val6m:h.controvaloreAttuale*Math.pow(1+r/100/12,6),val12m:h.controvaloreAttuale*Math.pow(1+r/100/12,12)};
-      }).sort((a,b)=>b.controvaloreAttuale-a.controvaloreAttuale));
-    } catch(e) { setScenarios({error:`Errore: ${e.message}`}); }
-    setLoading(false);
-  };
-
-  const SC={base:"#1D9E75",ottimistico:"#7F77DD",pessimistico:"#D85A30"};
-  const chartSeries = scenarios&&!scenarios.error
-    ? [
-        {data:project(scenarios.ottimistico.rendimento),color:SC.ottimistico,dash:"4 2",opacity:0.7,label:"Ottimistico"},
-        {data:project(scenarios.base.rendimento),color:SC.base,width:2,label:"Base"},
-        {data:project(scenarios.pessimistico.rendimento),color:SC.pessimistico,dash:"4 2",opacity:0.7,label:"Pessimistico"},
-      ]
-    : [{data:project(rendPonderato),color:"#888",width:1.5,dash:"4 2",label:"Storico"}];
-
-  return (
-    <div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:"1.25rem" }}>
-        {[
-          {label:"Valore oggi",value:fmtEur(totalValue),sub:new Date().toLocaleDateString("it-IT")},
-          {label:"Rend. medio storico",value:fmtPct(rendPonderato),sub:"ponderato per controvalore"},
-          {label:"Mesi rimanenti 2026",value:(12-today.getMonth()).toString(),sub:"fino a dicembre"},
-        ].map((c,i)=>(
-          <div key={i} style={{ background:"#1e2235", borderRadius:10, padding:"14px 16px" }}>
-            <div style={{ fontSize:12, color:"#888", marginBottom:4 }}>{c.label}</div>
-            <div style={{ fontSize:22, fontWeight:500 }}>{c.value}</div>
-            <div style={{ fontSize:12, color:"#888", marginTop:3 }}>{c.sub}</div>
-          </div>
-        ))}
+    <div style={{background:"#1e2235",borderRadius:10,padding:"1.25rem",marginBottom:"1rem"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div><div style={{fontWeight:500,fontSize:14}}>Piano d'Azione AI</div><div style={{fontSize:11,color:"#888"}}>Analisi titolo per titolo</div></div>
+        <button onClick={run} disabled={loading} style={{padding:"8px 14px",borderRadius:8,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:loading?"not-allowed":"pointer",fontSize:13,fontWeight:500}}>{loading?"In corso…":actions?"Aggiorna":"Avvia analisi"}</button>
       </div>
-      <div style={{ background:"#1e2235", borderRadius:10, padding:"1.25rem", marginBottom:"1rem" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"1rem" }}>
-          <div style={{ fontWeight:500, fontSize:14 }}>Proiezione 2026</div>
-          <div style={{ display:"flex", gap:12 }}>
-            {chartSeries.map((s,i)=>(
-              <div key={i} style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, color:"#888" }}>
-                <div style={{ width:18, height:2, background:s.color, opacity:s.opacity??1 }}/>{s.label}
-              </div>
+      {!actions&&!loading&&<div style={{fontSize:13,color:"#888",fontStyle:"italic",marginTop:"1rem"}}>Clicca "Avvia analisi".</div>}
+      {loading&&<div style={{fontSize:13,color:"#888",marginTop:"1rem"}}>Gemini sta analizzando…</div>}
+      {actions?.error&&<div style={{color:"#D85A30",fontSize:13,marginTop:"1rem"}}>{actions.error}</div>}
+      {actions&&!actions.error&&(
+        <div style={{marginTop:"1rem",paddingTop:"1rem",borderTop:"0.5px solid #2a2a3e"}}>
+          <div style={{fontSize:13,color:"#aaa",fontStyle:"italic",marginBottom:"1rem"}}>{actions.sommario}</div>
+          {actions.ribilanciamento&&<div style={{background:"#12121e",border:"0.5px solid #7F77DD40",borderRadius:8,padding:"9px 12px",marginBottom:"1rem",fontSize:13}}><span style={{fontWeight:500,color:"#7F77DD",marginRight:6}}>Ribilanciamento:</span><span style={{color:"#aaa"}}>{actions.ribilanciamento}</span></div>}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <button onClick={()=>setFilterTipo("tutti")} style={{padding:"4px 12px",borderRadius:20,fontSize:12,cursor:"pointer",border:filterTipo==="tutti"?"1px solid #888":"0.5px solid #333",background:filterTipo==="tutti"?"#2a2a3e":"transparent",color:"white"}}>Tutti ({actions.titoli?.length??0})</button>
+            {Object.entries(AZIONE_META).filter(([k])=>(cnt[k]??0)>0).map(([key,meta])=>(
+              <button key={key} onClick={()=>setFilterTipo(key)} style={{padding:"4px 12px",borderRadius:20,fontSize:12,cursor:"pointer",border:filterTipo===key?`1px solid ${meta.color}`:`0.5px solid ${meta.color}40`,background:filterTipo===key?meta.bg:"transparent",color:meta.color}}>
+                {meta.icon} {meta.label} ({cnt[key]})
+              </button>
             ))}
           </div>
         </div>
-        <LineChart months={months} series={chartSeries} />
-        {scenarios&&!scenarios.error&&(
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginTop:"1rem" }}>
-            {["ottimistico","base","pessimistico"].map(key=>{
-              const s=scenarios[key],color=SC[key],val=project(s.rendimento).at(-1);
-              return (
-                <div key={key} style={{ background:"#12121e", borderRadius:8, padding:"10px 12px", border:`0.5px solid ${color}40` }}>
-                  <div style={{ fontSize:11, color:"#888", marginBottom:2 }}>{s.nome}</div>
-                  <div style={{ fontSize:17, fontWeight:500, color }}>{fmtEur(val)}</div>
-                  <div style={{ fontSize:11, color:"#888" }}>{s.rendimento>=0?"+":""}{s.rendimento.toFixed(1)}%</div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-      <div style={{ background:"#1e2235", borderRadius:10, padding:"1.25rem", marginBottom:"1rem" }}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div>
-            <div style={{ fontWeight:500, fontSize:15 }}>Scenari AI</div>
-            <div style={{ fontSize:12, color:"#888" }}>Claude analizza il contesto di mercato</div>
-          </div>
-          <button onClick={run} disabled={loading} style={{ padding:"8px 16px", borderRadius:8, border:"0.5px solid #444", background:"#2a2a3e", color:"white", cursor:loading?"not-allowed":"pointer", fontSize:13, fontWeight:500 }}>
-            {loading?"Analisi in corso…":scenarios?"Aggiorna":"Avvia previsione"}
-          </button>
-        </div>
-        {scenarios?.error&&<div style={{ color:"#D85A30", fontSize:13, marginTop:"1rem" }}>{scenarios.error}</div>}
-        {scenarios&&!scenarios.error&&(
-          <div style={{ marginTop:"1rem" }}>
-            <div style={{ fontSize:13, color:"#888", fontStyle:"italic", marginBottom:"1rem" }}>{scenarios.contesto}</div>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:"1rem" }}>
-              {["ottimistico","base","pessimistico"].map(key=>{
-                const s=scenarios[key],color=SC[key];
-                return (
-                  <div key={key} style={{ background:"#12121e", borderRadius:8, padding:12, border:`0.5px solid ${color}40` }}>
-                    <div style={{ fontSize:12, fontWeight:500, color, marginBottom:6 }}>{s.nome}</div>
-                    <div style={{ fontSize:20, fontWeight:500, color }}>{s.rendimento>=0?"+":""}{s.rendimento.toFixed(1)}%</div>
-                    <div style={{ fontSize:11, color:"#888", marginTop:4 }}>{s.motivazione}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ borderTop:"0.5px solid #2a2a3e", paddingTop:"1rem" }}>
-              <div style={{ fontSize:13, fontWeight:500, marginBottom:8 }}>Raccomandazioni</div>
-              {scenarios.raccomandazioni?.map((r,i)=>(
-                <div key={i} style={{ display:"flex", gap:8, marginBottom:6, fontSize:13 }}>
-                  <span style={{ color:"#1D9E75", fontWeight:500, flexShrink:0 }}>{i+1}.</span>
-                  <span style={{ color:"#aaa" }}>{r}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {!scenarios&&!loading&&<div style={{ fontSize:13, color:"#888", fontStyle:"italic", marginTop:"1rem" }}>Clicca "Avvia previsione".</div>}
-      </div>
-    </div>
-  );
-}
-
-function AzioniTab({ allHoldings, totalValue, byCat }) {
-  const [actions, setActions] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(null);
-  const [filterTipo, setFilterTipo] = useState("tutti");
-
-  const az=Object.entries(byCat).filter(([k])=>k.toLowerCase().includes("azion")).reduce((s,[,v])=>s+v,0);
-  const ob=Object.entries(byCat).filter(([k])=>k.toLowerCase().includes("obblig")).reduce((s,[,v])=>s+v,0);
-  const pctAz=totalValue>0?(az/totalValue*100).toFixed(1):0;
-  const pctOb=totalValue>0?(ob/totalValue*100).toFixed(1):0;
-
-  const run = async () => {
-    setLoading(true); setActions(null); setExpanded(null);
-    const righe=allHoldings.filter(h=>h.controvaloreAttuale>0).map((h,i)=>{
-      const nome=h.nome.length>40?h.nome.slice(0,40):h.nome;
-      const peso=totalValue>0?(h.controvaloreAttuale/totalValue*100).toFixed(1):0;
-      return `${i+1}. ${nome} | ${h.categoria} | €${Math.round(h.controvaloreAttuale)} (${peso}%) | rend:${h.rendimentoAnnuo!=null?h.rendimentoAnnuo+"%":"n/d"}`;
-    }).join("\n");
-    try {
-      const text = await callClaude(
-        "Sei un consulente finanziario italiano. Rispondi SEMPRE e SOLO con JSON valido, senza testo prima o dopo, senza markdown.",
-        `Portafoglio BILANCIATO, aprile 2026. Totale €${Math.round(totalValue).toLocaleString("it-IT")}. Azionario ${pctAz}% (target 50-65%), Obbligazionario ${pctOb}% (target 30-45%). Contesto: tensioni USA-Cina, BCE ferma.\n\nTITOLI:\n${righe}\n\nPer ogni titolo: azione (vendi/monitora/mantieni/incrementa/switch) e priorità (alta/media/bassa). JSON: {"sommario":"...","ribilanciamento":"...","titoli":[{"nome":"...","azione":"mantieni","priorita":"media","motivazione":"...","cosa_fare":"..."}]}`,
-        4000
-      );
-      const json=extractJSON(text);
-      if(!json.titoli||!Array.isArray(json.titoli)) throw new Error("Struttura non valida");
-      setActions(json);
-    } catch(e) { setActions({error:`Errore: ${e.message}`}); }
-    setLoading(false);
-  };
-
-  const titoliFiltered=actions?.titoli?.filter(t=>filterTipo==="tutti"||t.azione===filterTipo)??[];
-  const conteggio=actions?.titoli?Object.keys(AZIONE_META).reduce((acc,k)=>{acc[k]=actions.titoli.filter(t=>t.azione===k).length;return acc;},{}):{};
-
-  return (
-    <div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:"1.25rem" }}>
-        {[
-          {label:"Azionario attuale",value:pctAz+"%",sub:"target 50–65%",alert:pctAz>65||pctAz<50},
-          {label:"Obbligazionario attuale",value:pctOb+"%",sub:"target 30–45%",alert:pctOb>45||pctOb<30},
-          {label:"Titoli",value:allHoldings.filter(h=>h.controvaloreAttuale>0).length.toString(),sub:"portafoglio completo"},
-        ].map((c,i)=>(
-          <div key={i} style={{ background:c.alert?"#EF9F2710":"#1e2235", border:c.alert?"0.5px solid #EF9F2740":"none", borderRadius:10, padding:"14px 16px" }}>
-            <div style={{ fontSize:12, color:"#888", marginBottom:4 }}>{c.label}</div>
-            <div style={{ fontSize:22, fontWeight:500, color:c.alert?"#EF9F27":"white" }}>{c.value}</div>
-            <div style={{ fontSize:12, color:"#888", marginTop:3 }}>{c.sub}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ background:"#1e2235", borderRadius:10, padding:"1.25rem", marginBottom:"1rem" }}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div>
-            <div style={{ fontWeight:500, fontSize:15 }}>Piano d'Azione AI</div>
-            <div style={{ fontSize:12, color:"#888" }}>Analisi titolo per titolo</div>
-          </div>
-          <button onClick={run} disabled={loading} style={{ padding:"8px 16px", borderRadius:8, border:"0.5px solid #444", background:"#2a2a3e", color:"white", cursor:loading?"not-allowed":"pointer", fontSize:13, fontWeight:500 }}>
-            {loading?"Analisi in corso…":actions?"Aggiorna":"Avvia analisi"}
-          </button>
-        </div>
-        {!actions&&!loading&&<div style={{ fontSize:13, color:"#888", fontStyle:"italic", marginTop:"1rem" }}>Clicca "Avvia analisi".</div>}
-        {loading&&<div style={{ fontSize:13, color:"#888", marginTop:"1rem" }}>Claude sta analizzando…</div>}
-        {actions?.error&&<div style={{ color:"#D85A30", fontSize:13, marginTop:"1rem" }}>{actions.error}</div>}
-        {actions&&!actions.error&&(
-          <div style={{ marginTop:"1rem", paddingTop:"1rem", borderTop:"0.5px solid #2a2a3e" }}>
-            <div style={{ fontSize:13, color:"#aaa", fontStyle:"italic", marginBottom:"1rem" }}>{actions.sommario}</div>
-            {actions.ribilanciamento&&(
-              <div style={{ background:"#12121e", border:"0.5px solid #7F77DD40", borderRadius:8, padding:"10px 12px", marginBottom:"1rem", fontSize:13 }}>
-                <span style={{ fontWeight:500, color:"#7F77DD", marginRight:6 }}>Ribilanciamento:</span>
-                <span style={{ color:"#aaa" }}>{actions.ribilanciamento}</span>
-              </div>
-            )}
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-              <button onClick={()=>setFilterTipo("tutti")} style={{ padding:"4px 12px", borderRadius:20, fontSize:12, cursor:"pointer", border:filterTipo==="tutti"?"1px solid #888":"0.5px solid #333", background:filterTipo==="tutti"?"#2a2a3e":"transparent", color:"white" }}>
-                Tutti ({actions.titoli?.length??0})
-              </button>
-              {Object.entries(AZIONE_META).filter(([k])=>(conteggio[k]??0)>0).map(([key,meta])=>(
-                <button key={key} onClick={()=>setFilterTipo(key)} style={{ padding:"4px 12px", borderRadius:20, fontSize:12, cursor:"pointer", border:filterTipo===key?`1px solid ${meta.color}`:`0.5px solid ${meta.color}40`, background:filterTipo===key?meta.bg:"transparent", color:meta.color }}>
-                  {meta.icon} {meta.label} ({conteggio[key]})
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-      {titoliFiltered.length>0&&(
-        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {titoliFiltered.map((t,i)=>{
-            const meta=AZIONE_META[t.azione]??AZIONE_META.mantieni;
-            const holding=allHoldings.find(h=>h.nome===t.nome||h.nome.toLowerCase().startsWith(t.nome.toLowerCase().slice(0,20)));
-            const isOpen=expanded===i;
-            return (
-              <div key={i} onClick={()=>setExpanded(isOpen?null:i)}
-                style={{ background:"#1e2235", border:`0.5px solid ${meta.color}30`, borderRadius:10, overflow:"hidden", cursor:"pointer" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px" }}>
-                  <div style={{ minWidth:90, padding:"3px 8px", borderRadius:4, textAlign:"center", background:meta.bg, color:meta.color, fontSize:11, fontWeight:500 }}>
-                    {meta.icon} {meta.label}
-                  </div>
-                  <div style={{ width:6, height:6, borderRadius:"50%", flexShrink:0, background:t.priorita==="alta"?"#D85A30":t.priorita==="media"?"#EF9F27":"#888" }}/>
-                  <div style={{ flex:1, fontSize:13, fontWeight:500, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t.nome}</div>
-                  {holding&&<div style={{ fontSize:13, fontWeight:500, flexShrink:0 }}>{fmtEur(holding.controvaloreAttuale)}</div>}
-                  <div style={{ fontSize:12, color:"#888", flexShrink:0 }}>{isOpen?"▲":"▼"}</div>
-                </div>
-                {isOpen&&(
-                  <div style={{ padding:"0 14px 14px", borderTop:"0.5px solid #2a2a3e" }}>
-                    <div style={{ paddingTop:12, display:"flex", flexDirection:"column", gap:10 }}>
-                      <div>
-                        <div style={{ fontSize:11, color:"#888", fontWeight:500, marginBottom:3, textTransform:"uppercase" }}>Perché</div>
-                        <div style={{ fontSize:13, lineHeight:1.6, color:"#ccc" }}>{t.motivazione}</div>
-                      </div>
-                      <div style={{ background:meta.bg, borderRadius:8, padding:"10px 12px", border:`0.5px solid ${meta.color}30` }}>
-                        <div style={{ fontSize:11, color:meta.color, fontWeight:500, marginBottom:3, textTransform:"uppercase" }}>Cosa fare</div>
-                        <div style={{ fontSize:13, lineHeight:1.6 }}>{t.cosa_fare}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
       )}
     </div>
-  );
+    {tf.length>0&&(<div style={{display:"flex",flexDirection:"column",gap:8}}>
+      {tf.map((t,i)=>{
+        const meta=AZIONE_META[t.azione]??AZIONE_META.mantieni;
+        const h=holdings.find(x=>x.nome===t.nome||x.nome.toLowerCase().startsWith(t.nome.toLowerCase().slice(0,20)));
+        const open=expanded===i;
+        return(<div key={i} onClick={()=>setExpanded(open?null:i)} style={{background:"#1e2235",border:`0.5px solid ${meta.color}30`,borderRadius:10,overflow:"hidden",cursor:"pointer"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px"}}>
+            <div style={{minWidth:90,padding:"3px 8px",borderRadius:4,textAlign:"center",background:meta.bg,color:meta.color,fontSize:11,fontWeight:500}}>{meta.icon} {meta.label}</div>
+            <div style={{width:6,height:6,borderRadius:"50%",flexShrink:0,background:t.priorita==="alta"?"#D85A30":t.priorita==="media"?"#EF9F27":"#888"}}/>
+            <div style={{flex:1,fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.nome}</div>
+            {h&&<div style={{fontSize:13,fontWeight:500,flexShrink:0}}>{fmtEur(h.controvaloreAttuale)}</div>}
+            <div style={{fontSize:12,color:"#888",flexShrink:0}}>{open?"▲":"▼"}</div>
+          </div>
+          {open&&(<div style={{padding:"0 14px 14px",borderTop:"0.5px solid #2a2a3e"}}>
+            <div style={{paddingTop:12,display:"flex",flexDirection:"column",gap:10}}>
+              <div><div style={{fontSize:11,color:"#888",fontWeight:500,marginBottom:3,textTransform:"uppercase"}}>Perché</div><div style={{fontSize:13,lineHeight:1.6,color:"#ccc"}}>{t.motivazione}</div></div>
+              <div style={{background:meta.bg,borderRadius:8,padding:"10px 12px",border:`0.5px solid ${meta.color}30`}}>
+                <div style={{fontSize:11,color:meta.color,fontWeight:500,marginBottom:3,textTransform:"uppercase"}}>Cosa fare</div>
+                <div style={{fontSize:13,lineHeight:1.6}}>{t.cosa_fare}</div>
+              </div>
+              {h&&<div style={{display:"flex",gap:14,fontSize:12,color:"#888",flexWrap:"wrap"}}>
+                {h.plusMinus!=null&&<span>P&L: <strong style={{color:h.plusMinus>=0?"#1D9E75":"#D85A30"}}>{fmtEur(h.plusMinus)}</strong></span>}
+                {h.quantita&&<span>Quote: <strong style={{color:"white"}}>{fmt(h.quantita)}</strong></span>}
+                <span>Peso: <strong style={{color:"white"}}>{totalValue>0?(h.controvaloreAttuale/totalValue*100).toFixed(1):"—"}%</strong></span>
+              </div>}
+            </div>
+          </div>)}
+        </div>);
+      })}
+    </div>)}
+  </div>);
 }
 
-function App() {
-  const [bankData, setBankData] = useState({ MD: MEDIOLANUM_DATA, BPER: BPER_DATA, PI: PI_DATA });
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [sortCol, setSortCol] = useState("controvaloreAttuale");
-  const [sortDir, setSortDir] = useState("desc");
-  const [filterBank, setFilterBank] = useState("all");
-  const [filterCat, setFilterCat] = useState("all");
-  const [search, setSearch] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [filterBankAI, setFilterBankAI] = useState("all");
+function App(){
+  const[bankData,setBankData]=useState({MD:MD_DATA,BPER:BPER_DATA,PI:PI_DATA});
+  const[tab,setTab]=useState("dashboard");
+  const[sortCol,setSortCol]=useState("controvaloreAttuale");
+  const[sortDir,setSortDir]=useState("desc");
+  const[fBank,setFBank]=useState("all");
+  const[fCat,setFCat]=useState("all");
+  const[search,setSearch]=useState("");
+  const[apiKey,setApiKey]=useState("");
+  const[showKey,setShowKey]=useState(false);
+  const[bankAI,setBankAI]=useState("all");
 
-  // Aggiungi C/C Mediolanum se non presente
-  React.useEffect(() => {
-    setBankData(prev => {
-      const md = prev.MD || [];
-      if (!md.find(h => h.nome === "Conto Corrente Mediolanum")) {
-        return { ...prev, MD: [...md, { nome: "Conto Corrente Mediolanum", isin: null, quantita: 1, prezzoCarico: null, controvaloreAttuale: 5790, categoria: "Monetario", banca: "MD", plusMinus: null, rendimentoAnnuo: null }] };
-      }
-      return prev;
-    });
-  }, []);
+  const all=Object.values(bankData).flat();
+  const live=useLivePrices(all);
 
-  const allHoldings = Object.values(bankData).flat();
-  const liveData = useLivePrices(allHoldings);
+  const aiAll=bankAI==="all"?all:all.filter(h=>h.banca===bankAI);
+  const aiH=aiAll.filter(h=>!isLiq(h));
+  const aiLiq=aiAll.filter(h=>isLiq(h));
+  const aiTotal=aiH.reduce((s,h)=>s+(h.controvaloreAttuale||0),0);
+  const aiLiqTotal=aiLiq.reduce((s,h)=>s+(h.controvaloreAttuale||0),0);
+  const aiByCat={};aiH.forEach(h=>{if(h.controvaloreAttuale)aiByCat[h.categoria]=(aiByCat[h.categoria]||0)+h.controvaloreAttuale;});
+  const aiCatData=Object.entries(aiByCat).map(([label,value])=>({label,value,color:CAT_COLORS[label]||"#888"})).sort((a,b)=>b.value-a.value);
 
-  // Categorie liquidità (escluse dall'analisi AI)
-  const isLiquidita = h => h.categoria === "Monetario" || h.nome.toLowerCase().includes("conto corrente") || h.nome.toLowerCase().includes("libretto");
+  const totalValue=all.reduce((s,h)=>s+(h.controvaloreAttuale||0),0);
+  const totalPL=all.reduce((s,h)=>s+(h.plusMinus||0),0);
+  const totalInv=all.reduce((s,h)=>s+(h.prezzoCarico&&h.quantita?h.prezzoCarico*h.quantita:(h.controvaloreAttuale||0)-(h.plusMinus||0)),0);
+  const totalPLpct=totalInv>0?(totalPL/totalInv)*100:null;
 
-  // Holdings filtrati per AI (banca selezionata) — separati in titoli e liquidità
-  const aiAllHoldings = filterBankAI === "all" ? allHoldings : allHoldings.filter(h => h.banca === filterBankAI);
-  const aiHoldings = aiAllHoldings.filter(h => !isLiquidita(h));         // solo titoli
-  const aiLiquidita = aiAllHoldings.filter(h => isLiquidita(h));          // solo C/C e libretti
-  const aiTotalValue = aiHoldings.reduce((s,h) => s + (h.controvaloreAttuale||0), 0);
-  const aiTotalLiquidita = aiLiquidita.reduce((s,h) => s + (h.controvaloreAttuale||0), 0);
-  const aiByCat = {};
-  aiHoldings.forEach(h => { if(h.controvaloreAttuale) aiByCat[h.categoria] = (aiByCat[h.categoria]||0) + h.controvaloreAttuale; });
-  const aiCatData = Object.entries(aiByCat).map(([label,value]) => ({ label, value, color: CATEGORY_COLORS[label]||"#888" })).sort((a,b) => b.value - a.value);
+  const byBank=Object.keys(BANKS).map(k=>({name:BANKS[k].name,code:k,color:BANKS[k].color,value:(bankData[k]||[]).reduce((s,h)=>s+(h.controvaloreAttuale||0),0)})).filter(b=>b.value>0);
+  const byCat={};all.forEach(h=>{if(h.controvaloreAttuale)byCat[h.categoria]=(byCat[h.categoria]||0)+h.controvaloreAttuale;});
+  const catData=Object.entries(byCat).map(([label,value])=>({label,value,color:CAT_COLORS[label]||"#888"})).sort((a,b)=>b.value-a.value);
+  const categories=[...new Set(all.map(h=>h.categoria))];
 
-  const totalValue    = allHoldings.reduce((s,h)=>s+(h.controvaloreAttuale||0),0);
-  const totalPL       = allHoldings.reduce((s,h)=>s+(h.plusMinus||0),0);
-  const totalInvested = allHoldings.reduce((s,h)=>s+(h.prezzoCarico&&h.quantita?h.prezzoCarico*h.quantita:(h.controvaloreAttuale||0)-(h.plusMinus||0)),0);
-  const totalPLpct    = totalInvested>0?(totalPL/totalInvested)*100:null;
-
-  const byBank = Object.keys(BANKS).map(k=>({
-    name:BANKS[k].name, code:k, color:BANKS[k].color,
-    value:(bankData[k]||[]).reduce((s,h)=>s+(h.controvaloreAttuale||0),0),
-  })).filter(b=>b.value>0);
-
-  const byCat={};
-  allHoldings.forEach(h=>{if(h.controvaloreAttuale)byCat[h.categoria]=(byCat[h.categoria]||0)+h.controvaloreAttuale;});
-  const catData=Object.entries(byCat).map(([label,value])=>({label,value,color:CATEGORY_COLORS[label]||"#888"})).sort((a,b)=>b.value-a.value);
-  const categories=[...new Set(allHoldings.map(h=>h.categoria))];
-
-  const handleSort=col=>{
-    if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");
-    else{setSortCol(col);setSortDir("desc");}
-  };
-
-  const filteredHoldings=allHoldings
-    .filter(h=>filterBank==="all"||h.banca===filterBank)
-    .filter(h=>filterCat==="all"||h.categoria===filterCat)
-    .filter(h=>!search||h.nome.toLowerCase().includes(search.toLowerCase()))
-    .sort((a,b)=>{
-      const va=a[sortCol]??-Infinity,vb=b[sortCol]??-Infinity;
-      return sortDir==="asc"?(va>vb?1:-1):(va<vb?1:-1);
-    });
+  const handleSort=col=>{if(sortCol===col)setSortDir(d=>d==="asc"?"desc":"asc");else{setSortCol(col);setSortDir("desc");}};
+  const filtered=all.filter(h=>fBank==="all"||h.banca===fBank).filter(h=>fCat==="all"||h.categoria===fCat).filter(h=>!search||h.nome.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>{const va=a[sortCol]??-Infinity,vb=b[sortCol]??-Infinity;return sortDir==="asc"?(va>vb?1:-1):(va<vb?1:-1);});
 
   const TABS=["dashboard","titoli","analisi","previsioni","azioni"];
 
-  // Filtro banca AI toolbar
-  const AIBankFilter = () => (
-    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:"1.25rem", flexWrap:"wrap" }}>
-      <span style={{ fontSize:13, color:"#888" }}>Analizza:</span>
-      {["all", ...Object.keys(BANKS)].map(code => (
-        <button key={code} onClick={() => setFilterBankAI(code)} style={{
-          padding:"5px 12px", borderRadius:20, fontSize:12, cursor:"pointer",
-          border: filterBankAI===code ? `1px solid ${code==="all"?"#888":BANKS[code]?.color}` : "0.5px solid #333",
-          background: filterBankAI===code ? (code==="all"?"#2a2a3e":`${BANKS[code]?.color}20`) : "transparent",
-          color: code==="all" ? "white" : BANKS[code]?.color ?? "white",
-          fontWeight: filterBankAI===code ? 500 : 400,
-        }}>
-          {code==="all" ? `Tutto (${fmtEur(totalValue)})` : `${BANKS[code].name} (${fmtEur(byBank.find(b=>b.code===code)?.value??0)})`}
-        </button>
-      ))}
+  const AIFilter=()=>(
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:"1.25rem",flexWrap:"wrap"}}>
+      <span style={{fontSize:12,color:"#888"}}>Analizza:</span>
+      {["all",...Object.keys(BANKS)].map(code=>{
+        const val=code==="all"?all.filter(h=>!isLiq(h)).reduce((s,h)=>s+(h.controvaloreAttuale||0),0):(bankData[code]||[]).filter(h=>!isLiq(h)).reduce((s,h)=>s+(h.controvaloreAttuale||0),0);
+        return(<button key={code} onClick={()=>setBankAI(code)} style={{padding:"5px 12px",borderRadius:20,fontSize:12,cursor:"pointer",border:bankAI===code?`1px solid ${code==="all"?"#888":BANKS[code]?.color}`:"0.5px solid #333",background:bankAI===code?(code==="all"?"#2a2a3e":`${BANKS[code]?.color}20`):"transparent",color:code==="all"?"white":BANKS[code]?.color??"white",fontWeight:bankAI===code?500:400}}>
+          {code==="all"?"Tutto":BANKS[code].name} ({fmtEur(val)})
+        </button>);
+      })}
     </div>
   );
 
-  return (
-    <div style={{ fontFamily:"system-ui,sans-serif", background:"#12121e", color:"white", minHeight:"100vh", padding:"1rem" }}>
-      <div style={{ maxWidth:920, margin:"0 auto" }}>
+  const LiqBox=()=>aiLiqTotal>0?(<div style={{background:"#1e2235",borderRadius:10,padding:"10px 14px",marginBottom:"1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+    <span style={{fontSize:13,color:"#888"}}>💰 Liquidità (esclusa dall'analisi)</span>
+    <span style={{fontSize:14,fontWeight:500,color:"#A0A0B0"}}>{fmtEur(aiLiqTotal)}</span>
+  </div>):null;
 
-        {/* Header */}
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"1.5rem", flexWrap:"wrap", gap:10 }}>
-          <div>
-            <h1 style={{ margin:0, fontSize:22, fontWeight:500 }}>Portfolio Analyzer</h1>
-            <div style={{ fontSize:13, color:"#888" }}>Profilo bilanciato · {new Date().toLocaleDateString("it-IT")}</div>
-          </div>
-          <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-            {TABS.map(tab=>(
-              <button key={tab} onClick={()=>setActiveTab(tab)} style={{
-                padding:"6px 13px", borderRadius:8, border:"0.5px solid #444",
-                background:activeTab===tab?"#1e2235":"transparent",
-                color:activeTab===tab?"white":"#888",
-                cursor:"pointer", fontSize:13, fontWeight:activeTab===tab?500:400,
-                textTransform:"capitalize",
-              }}>{tab}</button>
-            ))}
-          </div>
+  return(<div style={{fontFamily:"system-ui,sans-serif",background:"#12121e",color:"white",minHeight:"100vh",padding:"1rem"}}>
+    <div style={{maxWidth:940,margin:"0 auto"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.5rem",flexWrap:"wrap",gap:10}}>
+        <div>
+          <h1 style={{margin:0,fontSize:22,fontWeight:500}}>Portfolio Analyzer</h1>
+          <div style={{fontSize:12,color:"#888"}}>Profilo bilanciato · {new Date().toLocaleDateString("it-IT")}</div>
         </div>
-
-        {/* API Key field */}
-        <div style={{ background:"#1e2235", borderRadius:10, padding:"10px 14px", marginBottom:"1.25rem", display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-          <span style={{ fontSize:12, color:"#888", flexShrink:0 }}>🔑 API Key Google:</span>
-          <input
-            type={showApiKey ? "text" : "password"}
-            value={apiKey}
-            onChange={e => { setApiKey(e.target.value); window._claudeApiKey = e.target.value; }}
-            placeholder="AIzaSy..."
-            style={{ flex:1, minWidth:200, padding:"5px 10px", borderRadius:6, border:"0.5px solid #444", background:"#12121e", color:"white", fontSize:12, fontFamily:"monospace" }}
-          />
-          <button onClick={() => setShowApiKey(s=>!s)} style={{ padding:"5px 10px", borderRadius:6, border:"0.5px solid #444", background:"transparent", color:"#888", cursor:"pointer", fontSize:12 }}>
-            {showApiKey ? "Nascondi" : "Mostra"}
-          </button>
-          {apiKey && <span style={{ fontSize:11, color:"#1D9E75" }}>✓ Key impostata</span>}
-          {!apiKey && <span style={{ fontSize:11, color:"#888", fontStyle:"italic" }}>Necessaria per Analisi, Previsioni e Azioni</span>}
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {TABS.map(t=><button key={t} onClick={()=>setTab(t)} style={{padding:"6px 12px",borderRadius:8,border:"0.5px solid #444",background:tab===t?"#1e2235":"transparent",color:tab===t?"white":"#888",cursor:"pointer",fontSize:13,fontWeight:tab===t?500:400,textTransform:"capitalize"}}>{t}</button>)}
         </div>
-
-        {/* Upload banche */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:"1.25rem" }}>
-          {Object.keys(BANKS).map(code=>(
-            <UploadZone key={code} bankCode={code} hasData={!!(bankData[code]?.length)}
-              onData={data=>setBankData(prev=>({...prev,[code]:data}))} />
-          ))}
-        </div>
-
-        {/* Totali per banca */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:"1.25rem" }}>
-          {byBank.map(b => (
-            <div key={b.code} style={{ background:"#1e2235", borderRadius:10, padding:"12px 16px", borderLeft:`3px solid ${b.color}` }}>
-              <div style={{ fontSize:12, color:"#888", marginBottom:3 }}>{b.name}</div>
-              <div style={{ fontSize:18, fontWeight:500, color:b.color }}>{fmtEur(b.value)}</div>
-              <div style={{ fontSize:11, color:"#888", marginTop:2 }}>{totalValue>0?Math.round(b.value/totalValue*100):"—"}% del totale</div>
-            </div>
-          ))}
-        </div>
-
-        <LiveBanner liveData={liveData} baseTotal={totalValue} />
-
-        {activeTab==="dashboard"&&<DashboardTab allHoldings={allHoldings} totalValue={totalValue} totalPL={totalPL} totalPLpct={totalPLpct} byBank={byBank} catData={catData} liveData={liveData}/>}
-        {activeTab==="titoli"&&<TitoliTab filteredHoldings={filteredHoldings} sortCol={sortCol} sortDir={sortDir} handleSort={handleSort} filterBank={filterBank} setFilterBank={setFilterBank} filterCat={filterCat} setFilterCat={setFilterCat} search={search} setSearch={setSearch} categories={categories} liveData={liveData} totalValue={totalValue}/>}
-        {activeTab==="analisi"&&<><AIBankFilter/>{aiTotalLiquidita>0&&<div style={{background:"#1e2235",borderRadius:10,padding:"10px 14px",marginBottom:"1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,color:"#888"}}>💰 Liquidità (esclusa dall'analisi)</span><span style={{fontSize:14,fontWeight:500,color:"#A0A0B0"}}>{fmtEur(aiTotalLiquidita)}</span></div>}<AnalisiTab allHoldings={aiHoldings} totalValue={aiTotalValue} byCat={aiByCat} catData={aiCatData}/></>}
-        {activeTab==="previsioni"&&<><AIBankFilter/>{aiTotalLiquidita>0&&<div style={{background:"#1e2235",borderRadius:10,padding:"10px 14px",marginBottom:"1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,color:"#888"}}>💰 Liquidità (esclusa dall'analisi)</span><span style={{fontSize:14,fontWeight:500,color:"#A0A0B0"}}>{fmtEur(aiTotalLiquidita)}</span></div>}<PrevisioniTab allHoldings={aiHoldings} totalValue={aiTotalValue}/></>}
-        {activeTab==="azioni"&&<><AIBankFilter/>{aiTotalLiquidita>0&&<div style={{background:"#1e2235",borderRadius:10,padding:"10px 14px",marginBottom:"1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,color:"#888"}}>💰 Liquidità (esclusa dall'analisi)</span><span style={{fontSize:14,fontWeight:500,color:"#A0A0B0"}}>{fmtEur(aiTotalLiquidita)}</span></div>}<AzioniTab allHoldings={aiHoldings} totalValue={aiTotalValue} byCat={aiByCat}/></>}
       </div>
+      <div style={{background:"#1e2235",borderRadius:10,padding:"10px 14px",marginBottom:"1.25rem",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+        <span style={{fontSize:12,color:"#888",flexShrink:0}}>🔑 API Key Google:</span>
+        <input type={showKey?"text":"password"} value={apiKey} onChange={e=>{setApiKey(e.target.value);window._aiKey=e.target.value;}} placeholder="AIzaSy…" style={{flex:1,minWidth:200,padding:"5px 10px",borderRadius:6,border:"0.5px solid #444",background:"#12121e",color:"white",fontSize:12,fontFamily:"monospace"}}/>
+        <button onClick={()=>setShowKey(s=>!s)} style={{padding:"5px 10px",borderRadius:6,border:"0.5px solid #444",background:"transparent",color:"#888",cursor:"pointer",fontSize:12}}>{showKey?"Nascondi":"Mostra"}</button>
+        {apiKey?<span style={{fontSize:11,color:"#1D9E75"}}>✓ Key impostata</span>:<span style={{fontSize:11,color:"#888",fontStyle:"italic"}}>Necessaria per Analisi/Previsioni/Azioni</span>}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:"1.25rem"}}>
+        {Object.keys(BANKS).map(code=><UploadZone key={code} bankCode={code} hasData={!!(bankData[code]?.length)} onData={data=>setBankData(prev=>({...prev,[code]:data}))}/>)}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:"1.25rem"}}>
+        {byBank.map(b=>(
+          <div key={b.code} style={{background:"#1e2235",borderRadius:10,padding:"12px 16px",borderLeft:`3px solid ${b.color}`}}>
+            <div style={{fontSize:12,color:"#888",marginBottom:3}}>{b.name}</div>
+            <div style={{fontSize:18,fontWeight:500,color:b.color}}>{fmtEur(b.value)}</div>
+            <div style={{fontSize:11,color:"#888",marginTop:2}}>{totalValue>0?Math.round(b.value/totalValue*100):"—"}% del totale</div>
+          </div>
+        ))}
+      </div>
+      <div style={{background:"#1e2235",borderRadius:10,padding:"12px 16px",marginBottom:"1.25rem",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+        <div style={{flex:1,minWidth:180}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontWeight:500,fontSize:14}}>{live.lastUpdate?"Stima valore attuale":"Prezzi live (benchmark)"}</span>
+            {live.lastUpdate&&<span style={{fontSize:10,padding:"2px 6px",borderRadius:4,background:"#EF9F2720",color:"#EF9F27",fontWeight:600}}>STIMA</span>}
+          </div>
+          {live.lastUpdate?(
+            <div style={{display:"flex",gap:12,marginTop:4,flexWrap:"wrap",alignItems:"center"}}>
+              <span style={{fontSize:19,fontWeight:500}}>{fmtEur(live.totalStimato)}</span>
+              <span style={{fontSize:13,color:(live.totalStimato-totalValue)>=0?"#1D9E75":"#D85A30"}}>{(live.totalStimato-totalValue)>=0?"+":""}{fmt((live.totalStimato-totalValue)/totalValue*100)}% ({(live.totalStimato-totalValue)>=0?"+":""}{fmtEur(live.totalStimato-totalValue)}) dal {DATA_RIF}</span>
+            </div>
+          ):<div style={{fontSize:12,color:"#888",marginTop:2}}>Stima basata su benchmark dal {DATA_RIF}</div>}
+          {live.error&&<div style={{fontSize:11,color:"#EF9F27",marginTop:3}}>{live.error}</div>}
+          <div style={{fontSize:10,color:"#666",marginTop:4,fontStyle:"italic"}}>⚠ Non riflette il NAV reale dei fondi.</div>
+        </div>
+        <button onClick={live.refresh} disabled={live.loading} style={{padding:"8px 14px",borderRadius:8,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:live.loading?"not-allowed":"pointer",fontSize:13,fontWeight:500}}>
+          {live.loading?"Aggiornamento…":live.lastUpdate?`↻ ${live.lastUpdate.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"})}`:"Carica prezzi live"}
+        </button>
+      </div>
+      {tab==="dashboard"&&<DashboardTab all={all} totalValue={totalValue} totalPL={totalPL} totalPLpct={totalPLpct} byBank={byBank} catData={catData} live={live}/>}
+      {tab==="titoli"&&<TitoliTab filtered={filtered} sortCol={sortCol} sortDir={sortDir} handleSort={handleSort} fBank={fBank} setFBank={setFBank} fCat={fCat} setFCat={setFCat} search={search} setSearch={setSearch} categories={categories} live={live} totalValue={totalValue}/>}
+      {tab==="analisi"&&<><AIFilter/><LiqBox/><AnalisiTab holdings={aiH} totalValue={aiTotal} byCat={aiByCat} catData={aiCatData}/></>}
+      {tab==="previsioni"&&<><AIFilter/><LiqBox/><PrevisioniTab holdings={aiH} totalValue={aiTotal}/></>}
+      {tab==="azioni"&&<><AIFilter/><LiqBox/><AzioniTab holdings={aiH} totalValue={aiTotal} byCat={aiByCat}/></>}
     </div>
-  );
+  </div>);
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
