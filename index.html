@@ -12,9 +12,19 @@
 body{background:#12121e;color:white;font-family:system-ui,sans-serif;min-height:100vh;}
 input,select,button{font-family:inherit;}
 table{border-collapse:collapse;}
+@media print{
+  body{background:white;color:black;}
+  #root>div>div>*:not(#print-area){display:none!important;}
+  #print-area{display:block!important;color:black;font-family:system-ui,sans-serif;padding:2rem;}
+  #print-area h2{font-size:20px;margin-bottom:0.5rem;}
+  #print-area .print-meta{font-size:13px;color:#555;margin-bottom:1.5rem;}
+  #print-area .print-body{font-size:14px;line-height:1.8;white-space:pre-wrap;}
+  #print-area .print-footer{margin-top:2rem;font-size:11px;color:#888;border-top:1px solid #ccc;padding-top:0.5rem;}
+}
 </style>
 </head>
 <body>
+<div id="print-area" style={{display:"none"}}></div>
 <div id="root"></div>
 <script type="text/babel" data-presets="react">
 const{useState,useCallback,useRef,useEffect}=React;
@@ -321,6 +331,16 @@ function AnalisiTab({holdings,totalValue,byCat,catData}){
   const[done,setDone]=useState(false);
   const[storico,setStorico]=useState(()=>{try{return JSON.parse(localStorage.getItem("portfolio_analisi")||"[]");}catch{return[];}});
   const[viewIdx,setViewIdx]=useState(null);
+  const exportPDF=(entry)=>{
+    const el=document.getElementById("print-area");
+    el.innerHTML=`
+      <h2>Analisi Portafoglio</h2>
+      <div class="print-meta">Data: ${entry.data} &nbsp;|&nbsp; Valore portafoglio: ${entry.totale}</div>
+      <div class="print-body">${entry.testo.replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<br/>")}</div>
+      <div class="print-footer">Portfolio Analyzer · Generato il ${new Date().toLocaleDateString("it-IT")} · Analisi AI a solo scopo informativo, non costituisce consulenza finanziaria.</div>
+    `;
+    window.print();
+  };
   const saveS=text=>{const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),totale:fmtEur(totalValue),testo:text};const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_analisi",JSON.stringify(u));};
   const delE=id=>{const u=storico.filter(e=>e.id!==id);setStorico(u);localStorage.setItem("portfolio_analisi",JSON.stringify(u));setViewIdx(null);};
   const delAll=()=>{setStorico([]);localStorage.removeItem("portfolio_analisi");setViewIdx(null);};
@@ -380,6 +400,7 @@ function AnalisiTab({holdings,totalValue,byCat,catData}){
         {storico.map((e,i)=>(
           <div key={e.id} onClick={()=>setViewIdx(viewIdx===i?null:i)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,marginBottom:6,background:viewIdx===i?"#2a2a3e":"#12121e",border:viewIdx===i?"0.5px solid #7F77DD":"0.5px solid #2a2a3e",cursor:"pointer"}}>
             <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500}}>{e.data}</div><div style={{fontSize:11,color:"#888",marginTop:2}}>{e.totale} · {e.testo.slice(0,60)}…</div></div>
+            <button onClick={ev=>{ev.stopPropagation();exportPDF(e);}} style={{padding:"3px 8px",borderRadius:6,border:"0.5px solid #1D9E7540",background:"transparent",color:"#1D9E75",cursor:"pointer",fontSize:11,flexShrink:0}}>PDF</button>
             <button onClick={ev=>{ev.stopPropagation();delE(e.id);}} style={{padding:"3px 8px",borderRadius:6,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:11,flexShrink:0}}>✕</button>
           </div>
         ))}
