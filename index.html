@@ -450,7 +450,7 @@ function TitoliTab({filtered,sortCol,sortDir,handleSort,fBank,setFBank,fCat,setF
 }
 
 // ─── ANALISI ─────────────────────────────────────────────────────────────────
-function AnalisiTab({holdings,totalValue,byCat,catData}){
+function AnalisiTab({holdings,totalValue,byCat,catData,bancaLabel}){
   const[analysis,setAnalysis]=useState("");
   const[loading,setLoading]=useState(false);
   const[done,setDone]=useState(false);
@@ -459,10 +459,10 @@ function AnalisiTab({holdings,totalValue,byCat,catData}){
 
   const exportPDF=entry=>{
     const el=document.getElementById("print-area");
-    el.innerHTML=`<h2>Analisi Portafoglio</h2><div class="pm">Data: ${entry.data} &nbsp;|&nbsp; Valore: ${entry.totale}</div><div class="pb">${entry.testo.replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<br/>")}</div><div class="pf">Portfolio Analyzer · ${new Date().toLocaleDateString("it-IT")} · Solo scopo informativo, non costituisce consulenza finanziaria.</div>`;
+    el.innerHTML=`<h2>Analisi Portafoglio — ${entry.banca}</h2><div class="pm">Data: ${entry.data}</div><div class="pb">${entry.testo.replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<br/>")}</div><div class="pf">Portfolio Analyzer · ${new Date().toLocaleDateString("it-IT")} · Solo scopo informativo, non costituisce consulenza finanziaria.</div>`;
     window.print();
   };
-  const saveS=text=>{const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),totale:fmtEur(totalValue),testo:text};const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_analisi",JSON.stringify(u));};
+  const saveS=text=>{const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),banca:bancaLabel,testo:text};const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_analisi",JSON.stringify(u));};
   const delE=id=>{const u=storico.filter(e=>e.id!==id);setStorico(u);localStorage.setItem("portfolio_analisi",JSON.stringify(u));setViewIdx(null);};
   const delAll=()=>{setStorico([]);localStorage.removeItem("portfolio_analisi");setViewIdx(null);};
   const run=async()=>{
@@ -525,7 +525,7 @@ function AnalisiTab({holdings,totalValue,byCat,catData}){
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{flex:1}}>
                 <div style={{fontSize:13,fontWeight:500}}>{e.data}</div>
-                <div style={{fontSize:11,color:"#888",marginTop:2}}>{e.totale}</div>
+                <div style={{fontSize:12,color:"#1D9E75",marginTop:2}}>{e.banca||"—"}</div>
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={ev=>{ev.stopPropagation();exportPDF(e);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #1D9E7540",background:"transparent",color:"#1D9E75",cursor:"pointer",fontSize:12}}>PDF</button>
@@ -541,7 +541,7 @@ function AnalisiTab({holdings,totalValue,byCat,catData}){
 }
 
 // ─── PREVISIONI ──────────────────────────────────────────────────────────────
-function PrevisioniTab({holdings,totalValue}){
+function PrevisioniTab({holdings,totalValue,bancaLabel}){
   const[scenarios,setScenarios]=useState(null);
   const[loading,setLoading]=useState(false);
   const[perTitolo,setPerTitolo]=useState([]);
@@ -555,7 +555,7 @@ function PrevisioniTab({holdings,totalValue}){
   const SC={base:"#1D9E75",ottimistico:"#7F77DD",pessimistico:"#D85A30"};
 
   const saveS=json=>{
-    const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),totale:fmtEur(totalValue),json};
+    const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),banca:bancaLabel,json};
     const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_previsioni",JSON.stringify(u));
   };
   const delE=id=>{const u=storico.filter(e=>e.id!==id);setStorico(u);localStorage.setItem("portfolio_previsioni",JSON.stringify(u));setViewIdx(null);};
@@ -569,8 +569,8 @@ function PrevisioniTab({holdings,totalValue}){
     }).join("");
     const raccHTML=(j.raccomandazioni||[]).map((r,i)=>`<div>${i+1}. ${r}</div>`).join("");
     document.getElementById("print-area").innerHTML=`
-      <h2>Previsioni Portafoglio</h2>
-      <div class="pm">Data: ${entry.data} &nbsp;|&nbsp; Valore: ${entry.totale}</div>
+      <h2>Previsioni Portafoglio — ${entry.banca}</h2>
+      <div class="pm">Data: ${entry.data}</div>
       <div class="pb">
         <p style="font-style:italic;color:#555;margin-bottom:12px">${j.contesto||""}</p>
         <strong>Scenari 2026</strong>${scenariHTML}
@@ -649,7 +649,7 @@ function PrevisioniTab({holdings,totalValue}){
         {storico.map((e,i)=>(
           <div key={e.id} onClick={()=>setViewIdx(viewIdx===i?null:i)} style={{padding:"12px",borderRadius:10,marginBottom:8,background:viewIdx===i?"#2a2a3e":"#12121e",border:viewIdx===i?"0.5px solid #7F77DD":"0.5px solid #2a2a3e",cursor:"pointer"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div><div style={{fontSize:13,fontWeight:500}}>{e.data}</div><div style={{fontSize:11,color:"#888",marginTop:2}}>{e.totale}</div></div>
+              <div><div style={{fontSize:13,fontWeight:500}}>{e.data}</div><div style={{fontSize:12,color:"#1D9E75",marginTop:2}}>{e.banca||"—"}</div></div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={ev=>{ev.stopPropagation();exportPDF(e);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #1D9E7540",background:"transparent",color:"#1D9E75",cursor:"pointer",fontSize:12}}>PDF</button>
                 <button onClick={ev=>{ev.stopPropagation();delE(e.id);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>✕</button>
@@ -679,7 +679,7 @@ function PrevisioniTab({holdings,totalValue}){
 }
 
 // ─── AZIONI ──────────────────────────────────────────────────────────────────
-function AzioniTab({holdings,totalValue,byCat}){
+function AzioniTab({holdings,totalValue,byCat,bancaLabel}){
   const[actions,setActions]=useState(null);
   const[loading,setLoading]=useState(false);
   const[expanded,setExpanded]=useState(null);
@@ -693,7 +693,7 @@ function AzioniTab({holdings,totalValue,byCat}){
   const pOb=totalValue>0?(ob/totalValue*100).toFixed(1):0;
 
   const saveS=json=>{
-    const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),totale:fmtEur(totalValue),json};
+    const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),banca:bancaLabel,json};
     const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_azioni",JSON.stringify(u));
   };
   const delE=id=>{const u=storico.filter(e=>e.id!==id);setStorico(u);localStorage.setItem("portfolio_azioni",JSON.stringify(u));setViewIdx(null);};
@@ -703,8 +703,8 @@ function AzioniTab({holdings,totalValue,byCat}){
     const j=entry.json;
     const titoliHTML=(j.titoli||[]).map(t=>`<div style="margin-bottom:10px;padding:8px;border-left:3px solid #ccc"><strong>${t.nome}</strong> — <em>${t.azione}</em> (priorità: ${t.priorita})<br/>${t.motivazione}<br/><strong>Cosa fare:</strong> ${t.cosa_fare}</div>`).join("");
     document.getElementById("print-area").innerHTML=`
-      <h2>Piano d'Azione Portafoglio</h2>
-      <div class="pm">Data: ${entry.data} &nbsp;|&nbsp; Valore: ${entry.totale}</div>
+      <h2>Piano d'Azione — ${entry.banca}</h2>
+      <div class="pm">Data: ${entry.data}</div>
       <div class="pb">
         <p style="font-style:italic;color:#555;margin-bottom:12px">${j.sommario||""}</p>
         ${j.ribilanciamento?`<p style="margin-bottom:12px"><strong>Ribilanciamento:</strong> ${j.ribilanciamento}</p>`:""}
@@ -777,7 +777,7 @@ function AzioniTab({holdings,totalValue,byCat}){
         {storico.map((e,i)=>(
           <div key={e.id} onClick={()=>{setViewIdx(viewIdx===i?null:i);setExpanded(null);}} style={{padding:"12px",borderRadius:10,marginBottom:8,background:viewIdx===i?"#2a2a3e":"#12121e",border:viewIdx===i?"0.5px solid #7F77DD":"0.5px solid #2a2a3e",cursor:"pointer"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div><div style={{fontSize:13,fontWeight:500}}>{e.data}</div><div style={{fontSize:11,color:"#888",marginTop:2}}>{e.totale} · {e.json?.titoli?.length??0} titoli</div></div>
+              <div><div style={{fontSize:13,fontWeight:500}}>{e.data}</div><div style={{fontSize:12,color:"#1D9E75",marginTop:2}}>{e.banca||"—"}</div><div style={{fontSize:11,color:"#888",marginTop:1}}>{e.json?.titoli?.length??0} titoli</div></div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={ev=>{ev.stopPropagation();exportPDF(e);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #1D9E7540",background:"transparent",color:"#1D9E75",cursor:"pointer",fontSize:12}}>PDF</button>
                 <button onClick={ev=>{ev.stopPropagation();delE(e.id);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>✕</button>
@@ -817,6 +817,95 @@ function AzioniTab({holdings,totalValue,byCat}){
   </div>);
 }
 
+// ─── MANUALE ─────────────────────────────────────────────────────────────────
+function Manuale({onClose}){
+  const isMobile=useIsMobile();
+  const sections=[
+    {title:"1. Come avviare l'app",content:[
+      {type:"body",text:"L'app è contenuta in un singolo file <b>index.html</b>. Per usarla:"},
+      {type:"steps",items:["Apri <b>Visual Studio Code</b>","Installa l'estensione <b>Live Server</b> (se non già installata)","Apri la cartella contenente <b>index.html</b>","Tasto destro su index.html → <b>Open with Live Server</b>","Il browser si apre su <b>http://localhost:5500</b>"]},
+      {type:"warning",text:"⚠ Non aprire il file con doppio click — alcune funzionalità AI e prezzi live richiedono Live Server per funzionare correttamente."},
+    ]},
+    {title:"2. Impostazioni",content:[
+      {type:"h2",text:"API Key Google (Gemini)"},
+      {type:"body",text:"Inserisci la tua API key Google AI Studio nel campo dedicato. Necessaria per Analisi, Previsioni e Azioni. Ottienila su: <b>aistudio.google.com → Get API Key → Create API Key</b>"},
+      {type:"warning",text:"⚠ La key va reinserita ad ogni apertura del browser — non viene salvata per motivi di sicurezza."},
+      {type:"h2",text:"Aggiorna dati banche"},
+      {type:"body",text:"Quando ricevi nuovi estratti conto, carica un CSV nella sezione 'Aggiorna dati'. Colonne richieste: Nome; ISIN; Quantità; Prezzo_Carico; Prezzo_Attuale; Categoria."},
+      {type:"h2",text:"Prezzi live (benchmark)"},
+      {type:"body",text:"Clicca 'Carica prezzi live' per stimare il valore attuale del portafoglio. L'app applica la variazione % degli ETF benchmark ai controvalori del 29/04/2026."},
+      {type:"tip",text:"⚠ La stima è indicativa — non riflette il NAV reale dei tuoi fondi."},
+    ]},
+    {title:"3. Navigazione",content:[
+      {type:"body",text:"Su iPhone la navigazione avviene tramite la <b>tab bar in basso</b>. Su desktop i tab sono in alto a destra."},
+      {type:"table",headers:["Tab","Descrizione"],rows:[
+        ["Dashboard","Panoramica: valore totale, P&L, asset allocation, top 5 posizioni"],
+        ["Titoli","Lista completa con filtri per banca, categoria e ricerca"],
+        ["Analisi","Analisi AI con rischi, opportunità e raccomandazioni"],
+        ["Previsioni","Scenari AI per fine 2026 (ottimistico, base, pessimistico)"],
+        ["Azioni","Piano d'azione titolo per titolo generato da Gemini"],
+        ["Impostazioni","API key, aggiornamento dati, prezzi live, totali per banca"],
+      ]},
+    ]},
+    {title:"4. Analisi, Previsioni e Azioni AI",content:[
+      {type:"h2",text:"Filtro banca"},
+      {type:"body",text:"In cima a ciascuna tab AI trovi i pulsanti per selezionare quale banca analizzare: Tutto, Mediolanum, BPER Banca o Poste Italiane. La liquidità (C/C e libretti) viene sempre esclusa."},
+      {type:"h2",text:"Storico"},
+      {type:"body",text:"Ogni analisi/previsione/azione viene salvata automaticamente (max 5 per tab). Lo storico mostra data, ora e banca analizzata. Clicca su una voce per visualizzarla."},
+      {type:"h2",text:"Export PDF"},
+      {type:"steps",items:["Scorri fino allo Storico nella tab desiderata","Clicca il pulsante verde <b>PDF</b> accanto alla voce","Si apre la finestra di stampa del browser","Seleziona <b>'Salva come PDF'</b> e salva"]},
+      {type:"tip",text:"💡 Usa 'Rigenera' per aggiornare l'analisi quando cambiano le condizioni di mercato."},
+    ]},
+    {title:"5. Note importanti",content:[
+      {type:"warning",text:"📊 I dati sono aggiornati al 29/04/2026. Per aggiornare, carica un nuovo CSV dalla tab Impostazioni."},
+      {type:"warning",text:"💾 Lo storico è salvato nel browser locale. Non è accessibile da altri dispositivi. Se cancelli la cache del browser, lo storico verrà perso."},
+      {type:"tip",text:"🤖 Le analisi AI hanno scopo puramente informativo e non costituiscono consulenza finanziaria. Per decisioni di investimento, consulta sempre il tuo consulente."},
+    ]},
+  ];
+
+  const renderContent=items=>items.map((item,i)=>{
+    if(item.type==="body")return <p key={i} style={{fontSize:13,lineHeight:1.7,color:"#ccc",marginBottom:10}} dangerouslySetInnerHTML={{__html:item.text}}/>;
+    if(item.type==="h2")return <p key={i} style={{fontSize:13,fontWeight:700,color:"#378ADD",marginTop:12,marginBottom:6}}>{item.text}</p>;
+    if(item.type==="steps")return <ol key={i} style={{paddingLeft:20,marginBottom:10}}>{item.items.map((s,j)=><li key={j} style={{fontSize:13,color:"#ccc",lineHeight:1.7,marginBottom:4}} dangerouslySetInnerHTML={{__html:s}}/>)}</ol>;
+    if(item.type==="warning")return <div key={i} style={{background:"#EF9F2710",border:"0.5px solid #EF9F2740",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:12,color:"#EF9F27",lineHeight:1.6}}>{item.text}</div>;
+    if(item.type==="tip")return <div key={i} style={{background:"#1D9E7510",border:"0.5px solid #1D9E7540",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:12,color:"#1D9E75",lineHeight:1.6}}>{item.text}</div>;
+    if(item.type==="table")return(
+      <div key={i} style={{overflowX:"auto",marginBottom:10}}>
+        <table style={{width:"100%",fontSize:12,borderCollapse:"collapse"}}>
+          <thead><tr>{item.headers.map((h,j)=><th key={j} style={{textAlign:"left",padding:"7px 10px",background:"#2a2a3e",color:"#1D9E75",fontWeight:600,borderBottom:"1px solid #333"}}>{h}</th>)}</tr></thead>
+          <tbody>{item.rows.map((row,j)=><tr key={j} style={{borderBottom:"0.5px solid #2a2a3e"}}>{row.map((cell,k)=><td key={k} style={{padding:"8px 10px",color:k===0?"white":"#aaa",fontWeight:k===0?500:400,lineHeight:1.5}}>{cell}</td>)}</tr>)}</tbody>
+        </table>
+      </div>
+    );
+    return null;
+  });
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"#000000cc",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#1a1a2e",borderRadius:"20px 20px 0 0",width:"100%",maxWidth:680,maxHeight:"92vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        {/* Header */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px 14px",borderBottom:"0.5px solid #2a2a3e",flexShrink:0}}>
+          <div>
+            <div style={{fontSize:18,fontWeight:700}}>Manuale d'uso</div>
+            <div style={{fontSize:12,color:"#888",marginTop:2}}>Portfolio Analyzer v2.0</div>
+          </div>
+          <button onClick={onClose} style={{width:32,height:32,borderRadius:"50%",border:"none",background:"#2a2a3e",color:"#888",cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        </div>
+        {/* Content scrollabile */}
+        <div style={{overflowY:"auto",padding:"16px 20px 32px",flex:1}}>
+          {sections.map((s,i)=>(
+            <div key={i} style={{marginBottom:24}}>
+              <div style={{fontSize:15,fontWeight:700,color:"#1D9E75",marginBottom:12,paddingBottom:8,borderBottom:"0.5px solid #2a2a3e"}}>{s.title}</div>
+              {renderContent(s.content)}
+            </div>
+          ))}
+          <div style={{fontSize:11,color:"#555",textAlign:"center",paddingTop:8}}>Portfolio Analyzer v2.0 · Sviluppato con Claude (Anthropic)</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 function App(){
   const[bankData,setBankData]=useState({MD:MD_DATA,BPER:BPER_DATA,PI:PI_DATA});
@@ -829,6 +918,7 @@ function App(){
   const[apiKey,setApiKey]=useState("");
   const[showKey,setShowKey]=useState(false);
   const[bankAI,setBankAI]=useState("all");
+  const[showManual,setShowManual]=useState(false);
   const isMobile=useIsMobile();
 
   const all=Object.values(bankData).flat();
@@ -896,21 +986,25 @@ function App(){
 
   return(<div style={{fontFamily:"system-ui,sans-serif",background:"#12121e",color:"white",minHeight:"100vh",maxWidth:"100vw",overflowX:"hidden"}}>
     <div style={{maxWidth:940,margin:"0 auto",padding:isMobile?"12px 12px 90px":"1.5rem"}}>
+      {showManual&&<Manuale onClose={()=>setShowManual(false)}/>}
       {/* Header */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.25rem",flexWrap:"wrap",gap:10}}>
         <div>
           <h1 style={{margin:0,fontSize:isMobile?20:22,fontWeight:700}}>Portfolio Analyzer</h1>
           <div style={{fontSize:12,color:"#888"}}>Profilo bilanciato · {new Date().toLocaleDateString("it-IT")}</div>
         </div>
-        {!isMobile&&<TabBar/>}
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {!isMobile&&<TabBar/>}
+          <button onClick={()=>setShowManual(true)} style={{width:34,height:34,borderRadius:"50%",border:"0.5px solid #444",background:"#2a2a3e",color:"#aaa",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Manuale d'uso">?</button>
+        </div>
       </div>
 
       {/* Content */}
       {tab==="dashboard"&&<DashboardTab all={all} totalValue={totalValue} totalPL={totalPL} totalPLpct={totalPLpct} byBank={byBank} catData={catData} live={live}/>}
       {tab==="titoli"&&<TitoliTab filtered={filtered} sortCol={sortCol} sortDir={sortDir} handleSort={handleSort} fBank={fBank} setFBank={setFBank} fCat={fCat} setFCat={setFCat} search={search} setSearch={setSearch} categories={categories} live={live} totalValue={totalValue}/>}
-      {tab==="analisi"&&<><AIFilter/><LiqBox/><AnalisiTab holdings={aiH} totalValue={aiTotal} byCat={aiByCat} catData={aiCatData}/></>}
-      {tab==="previsioni"&&<><AIFilter/><LiqBox/><PrevisioniTab holdings={aiH} totalValue={aiTotal}/></>}
-      {tab==="azioni"&&<><AIFilter/><LiqBox/><AzioniTab holdings={aiH} totalValue={aiTotal} byCat={aiByCat}/></>}
+      {tab==="analisi"&&<><AIFilter/><LiqBox/><AnalisiTab holdings={aiH} totalValue={aiTotal} byCat={aiByCat} catData={aiCatData} bancaLabel={bankAI==="all"?"Tutto il portafoglio":BANKS[bankAI]?.name}/></>}
+      {tab==="previsioni"&&<><AIFilter/><LiqBox/><PrevisioniTab holdings={aiH} totalValue={aiTotal} bancaLabel={bankAI==="all"?"Tutto il portafoglio":BANKS[bankAI]?.name}/></>}
+      {tab==="azioni"&&<><AIFilter/><LiqBox/><AzioniTab holdings={aiH} totalValue={aiTotal} byCat={aiByCat} bancaLabel={bankAI==="all"?"Tutto il portafoglio":BANKS[bankAI]?.name}/></>}
       {tab==="impostazioni"&&<ImpostazioniTab bankData={bankData} setBankData={setBankData} apiKey={apiKey} setApiKey={setApiKey} showKey={showKey} setShowKey={setShowKey} byBank={byBank} totalValue={totalValue} live={live}/>}
     </div>
     {isMobile&&<TabBar/>}
