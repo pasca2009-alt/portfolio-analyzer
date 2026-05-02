@@ -545,22 +545,55 @@ function PrevisioniTab({holdings,totalValue}){
   const[scenarios,setScenarios]=useState(null);
   const[loading,setLoading]=useState(false);
   const[perTitolo,setPerTitolo]=useState([]);
+  const[storico,setStorico]=useState(()=>{try{return JSON.parse(localStorage.getItem("portfolio_previsioni")||"[]");}catch{return[];}});
+  const[viewIdx,setViewIdx]=useState(null);
+
   const rendP=holdings.length>0?holdings.reduce((s,h)=>s+getRend(h)*(h.controvaloreAttuale||0),0)/totalValue:0;
   const today=new Date();
   const months=[];for(let m=today.getMonth();m<=11;m++)months.push(["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"][m]);
   const proj=rate=>months.map((_,i)=>Math.round(totalValue*Math.pow(1+rate/100/12,i)));
+  const SC={base:"#1D9E75",ottimistico:"#7F77DD",pessimistico:"#D85A30"};
+
+  const saveS=json=>{
+    const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),totale:fmtEur(totalValue),json};
+    const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_previsioni",JSON.stringify(u));
+  };
+  const delE=id=>{const u=storico.filter(e=>e.id!==id);setStorico(u);localStorage.setItem("portfolio_previsioni",JSON.stringify(u));setViewIdx(null);};
+  const delAll=()=>{setStorico([]);localStorage.removeItem("portfolio_previsioni");setViewIdx(null);};
+
+  const exportPDF=entry=>{
+    const j=entry.json;
+    const scenariHTML=["ottimistico","base","pessimistico"].map(key=>{
+      const s=j[key];
+      return `<div style="margin-bottom:12px;padding:10px;border-left:3px solid #333"><strong>${s.nome}</strong> — ${s.rendimento>=0?"+":""}${s.rendimento.toFixed(1)}%<br/>${s.motivazione}</div>`;
+    }).join("");
+    const raccHTML=(j.raccomandazioni||[]).map((r,i)=>`<div>${i+1}. ${r}</div>`).join("");
+    document.getElementById("print-area").innerHTML=`
+      <h2>Previsioni Portafoglio</h2>
+      <div class="pm">Data: ${entry.data} &nbsp;|&nbsp; Valore: ${entry.totale}</div>
+      <div class="pb">
+        <p style="font-style:italic;color:#555;margin-bottom:12px">${j.contesto||""}</p>
+        <strong>Scenari 2026</strong>${scenariHTML}
+        <strong>Raccomandazioni</strong><div style="margin-top:8px">${raccHTML}</div>
+      </div>
+      <div class="pf">Portfolio Analyzer · ${new Date().toLocaleDateString("it-IT")} · Solo scopo informativo, non costituisce consulenza finanziaria.</div>`;
+    window.print();
+  };
+
   const run=async()=>{
-    setLoading(true);setScenarios(null);
+    setLoading(true);setScenarios(null);setViewIdx(null);
     const catBD={};holdings.forEach(h=>{catBD[h.categoria]=(catBD[h.categoria]||0)+(h.controvaloreAttuale||0);});
     try{
       const text=await callAI("Sei un consulente finanziario italiano. Rispondi SOLO con JSON valido, senza testo prima o dopo.",`Portafoglio bilanciato, aprile 2026. Totale €${Math.round(totalValue).toLocaleString("it-IT")}. Rendimento medio: ${rendP.toFixed(2)}%. Composizione: ${Object.entries(catBD).map(([k,v])=>`${k} ${Math.round(v/totalValue*100)}%`).join(", ")}. Contesto: tensioni USA-Cina, BCE ferma. JSON: {"contesto":"...","base":{"nome":"Scenario Base","rendimento":7.5,"motivazione":"..."},"ottimistico":{"nome":"Scenario Ottimistico","rendimento":11.0,"motivazione":"..."},"pessimistico":{"nome":"Scenario Pessimistico","rendimento":2.5,"motivazione":"..."},"raccomandazioni":["...","...","..."]}`,1200);
       const json=extractJSON(text);
-      setScenarios(json);
+      setScenarios(json);saveS(json);
       setPerTitolo(holdings.filter(h=>h.controvaloreAttuale>0).map(h=>{const r=getRend(h);return{...h,r,v6:h.controvaloreAttuale*Math.pow(1+r/100/12,6),v12:h.controvaloreAttuale*Math.pow(1+r/100/12,12)};}).sort((a,b)=>b.controvaloreAttuale-a.controvaloreAttuale));
     }catch(e){setScenarios({error:`Errore: ${e.message}`});}
     setLoading(false);
   };
-  const SC={base:"#1D9E75",ottimistico:"#7F77DD",pessimistico:"#D85A30"};
+
+  const displayScenarios=viewIdx!==null?storico[viewIdx]?.json:scenarios;
+
   return(<div>
     <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
       {[{l:"Valore oggi",v:fmtEur(totalValue),s:new Date().toLocaleDateString("it-IT")},{l:"Rendimento medio storico",v:fmtPct(rendP),s:"ponderato per controvalore"},{l:"Mesi rimanenti 2026",v:(12-today.getMonth()).toString(),s:"fino a dicembre"}].map((c,i)=>(
@@ -570,14 +603,14 @@ function PrevisioniTab({holdings,totalValue}){
         </div>
       ))}
     </div>
-    {scenarios&&!scenarios.error&&(
+    {displayScenarios&&!displayScenarios.error&&(
       <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
         {["ottimistico","base","pessimistico"].map(key=>{
-          const s=scenarios[key],color=SC[key],val=proj(s.rendimento).at(-1);
+          const s=displayScenarios[key],color=SC[key],val=proj(s.rendimento).at(-1);
           return(<div key={key} style={{background:"#1e2235",borderRadius:12,padding:"14px 16px",borderLeft:`3px solid ${color}`}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div><div style={{fontSize:12,color:"#888"}}>{s.nome}</div><div style={{fontSize:11,color:"#aaa",marginTop:4}}>{s.motivazione}</div></div>
-              <div style={{textAlign:"right",flexShrink:0,marginLeft:12}}>
+              <div style={{flex:1,marginRight:12}}><div style={{fontSize:12,color:"#888"}}>{s.nome}</div><div style={{fontSize:11,color:"#aaa",marginTop:4}}>{s.motivazione}</div></div>
+              <div style={{textAlign:"right",flexShrink:0}}>
                 <div style={{fontSize:18,fontWeight:700,color}}>{fmtEur(val)}</div>
                 <div style={{fontSize:12,color:"#888"}}>{s.rendimento>=0?"+":""}{s.rendimento.toFixed(1)}%</div>
               </div>
@@ -591,12 +624,13 @@ function PrevisioniTab({holdings,totalValue}){
         <div><div style={{fontWeight:600,fontSize:15}}>Scenari AI</div><div style={{fontSize:11,color:"#888"}}>Gemini analizza il contesto 2026</div></div>
         <button onClick={run} disabled={loading} style={{padding:"10px 16px",borderRadius:10,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:loading?"not-allowed":"pointer",fontSize:13,fontWeight:500}}>{loading?"In corso…":scenarios?"Aggiorna":"Avvia"}</button>
       </div>
-      {scenarios?.error&&<div style={{color:"#D85A30",fontSize:13,marginTop:12}}>{scenarios.error}</div>}
-      {scenarios&&!scenarios.error&&scenarios.raccomandazioni&&(
+      {displayScenarios?.error&&<div style={{color:"#D85A30",fontSize:13,marginTop:12}}>{displayScenarios.error}</div>}
+      {displayScenarios&&!displayScenarios.error&&displayScenarios.raccomandazioni&&(
         <div style={{marginTop:16,paddingTop:16,borderTop:"0.5px solid #2a2a3e"}}>
-          <div style={{fontSize:13,color:"#888",fontStyle:"italic",marginBottom:12}}>{scenarios.contesto}</div>
+          {viewIdx!==null&&<div style={{fontSize:11,color:"#888",marginBottom:10,fontStyle:"italic"}}>📅 {storico[viewIdx]?.data} · {storico[viewIdx]?.totale}</div>}
+          <div style={{fontSize:13,color:"#888",fontStyle:"italic",marginBottom:12}}>{displayScenarios.contesto}</div>
           <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>Raccomandazioni</div>
-          {scenarios.raccomandazioni.map((r,i)=>(
+          {displayScenarios.raccomandazioni.map((r,i)=>(
             <div key={i} style={{display:"flex",gap:10,marginBottom:8,fontSize:13}}>
               <span style={{color:"#1D9E75",fontWeight:600,flexShrink:0}}>{i+1}.</span>
               <span style={{color:"#aaa",lineHeight:1.6}}>{r}</span>
@@ -604,28 +638,38 @@ function PrevisioniTab({holdings,totalValue}){
           ))}
         </div>
       )}
-      {!scenarios&&!loading&&<div style={{fontSize:13,color:"#888",fontStyle:"italic",marginTop:12}}>Clicca "Avvia" per generare scenari di previsione AI.</div>}
+      {!displayScenarios&&!loading&&<div style={{fontSize:13,color:"#888",fontStyle:"italic",marginTop:12}}>Clicca "Avvia" per generare scenari di previsione AI.</div>}
     </Section>
+    {storico.length>0&&(
+      <Section>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+          <div style={{fontWeight:600,fontSize:14}}>Storico ({storico.length}/5)</div>
+          <button onClick={delAll} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>Cancella tutto</button>
+        </div>
+        {storico.map((e,i)=>(
+          <div key={e.id} onClick={()=>setViewIdx(viewIdx===i?null:i)} style={{padding:"12px",borderRadius:10,marginBottom:8,background:viewIdx===i?"#2a2a3e":"#12121e",border:viewIdx===i?"0.5px solid #7F77DD":"0.5px solid #2a2a3e",cursor:"pointer"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div><div style={{fontSize:13,fontWeight:500}}>{e.data}</div><div style={{fontSize:11,color:"#888",marginTop:2}}>{e.totale}</div></div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={ev=>{ev.stopPropagation();exportPDF(e);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #1D9E7540",background:"transparent",color:"#1D9E75",cursor:"pointer",fontSize:12}}>PDF</button>
+                <button onClick={ev=>{ev.stopPropagation();delE(e.id);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>✕</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </Section>
+    )}
     {perTitolo.length>0&&(
       <Section title="Stima per titolo">
         {perTitolo.map((h,i)=>(
           <div key={i} style={{padding:"10px 0",borderBottom:i<perTitolo.length-1?"0.5px solid #2a2a3e":"none"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-              <div style={{flex:1,marginRight:12}}>
-                <div style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.nome}</div>
-                <div style={{fontSize:11,color:"#888",marginTop:2}}>{h.categoria} · rend. {fmtPct(h.r)}</div>
-              </div>
+              <div style={{flex:1,marginRight:12}}><div style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.nome}</div><div style={{fontSize:11,color:"#888",marginTop:2}}>{h.categoria} · rend. {fmtPct(h.r)}</div></div>
               <div style={{fontSize:14,fontWeight:600,flexShrink:0}}>{fmtEur(h.controvaloreAttuale)}</div>
             </div>
             <div style={{display:"flex",gap:12}}>
-              <div style={{flex:1,background:"#2a2a3e",borderRadius:8,padding:"8px 10px"}}>
-                <div style={{fontSize:10,color:"#888"}}>+6 mesi</div>
-                <div style={{fontSize:14,fontWeight:600,color:h.v6>=h.controvaloreAttuale?"#1D9E75":"#D85A30"}}>{fmtEur(h.v6)}</div>
-              </div>
-              <div style={{flex:1,background:"#2a2a3e",borderRadius:8,padding:"8px 10px"}}>
-                <div style={{fontSize:10,color:"#888"}}>+12 mesi</div>
-                <div style={{fontSize:14,fontWeight:600,color:h.v12>=h.controvaloreAttuale?"#1D9E75":"#D85A30"}}>{fmtEur(h.v12)}</div>
-              </div>
+              <div style={{flex:1,background:"#2a2a3e",borderRadius:8,padding:"8px 10px"}}><div style={{fontSize:10,color:"#888"}}>+6 mesi</div><div style={{fontSize:14,fontWeight:600,color:h.v6>=h.controvaloreAttuale?"#1D9E75":"#D85A30"}}>{fmtEur(h.v6)}</div></div>
+              <div style={{flex:1,background:"#2a2a3e",borderRadius:8,padding:"8px 10px"}}><div style={{fontSize:10,color:"#888"}}>+12 mesi</div><div style={{fontSize:14,fontWeight:600,color:h.v12>=h.controvaloreAttuale?"#1D9E75":"#D85A30"}}>{fmtEur(h.v12)}</div></div>
             </div>
           </div>
         ))}
@@ -640,12 +684,38 @@ function AzioniTab({holdings,totalValue,byCat}){
   const[loading,setLoading]=useState(false);
   const[expanded,setExpanded]=useState(null);
   const[filterTipo,setFilterTipo]=useState("tutti");
+  const[storico,setStorico]=useState(()=>{try{return JSON.parse(localStorage.getItem("portfolio_azioni")||"[]");}catch{return[];}});
+  const[viewIdx,setViewIdx]=useState(null);
+
   const az=Object.entries(byCat).filter(([k])=>k.toLowerCase().startsWith("azion")).reduce((s,[,v])=>s+v,0);
   const ob=Object.entries(byCat).filter(([k])=>k.toLowerCase().startsWith("obblig")).reduce((s,[,v])=>s+v,0);
   const pAz=totalValue>0?(az/totalValue*100).toFixed(1):0;
   const pOb=totalValue>0?(ob/totalValue*100).toFixed(1):0;
+
+  const saveS=json=>{
+    const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),totale:fmtEur(totalValue),json};
+    const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_azioni",JSON.stringify(u));
+  };
+  const delE=id=>{const u=storico.filter(e=>e.id!==id);setStorico(u);localStorage.setItem("portfolio_azioni",JSON.stringify(u));setViewIdx(null);};
+  const delAll=()=>{setStorico([]);localStorage.removeItem("portfolio_azioni");setViewIdx(null);};
+
+  const exportPDF=entry=>{
+    const j=entry.json;
+    const titoliHTML=(j.titoli||[]).map(t=>`<div style="margin-bottom:10px;padding:8px;border-left:3px solid #ccc"><strong>${t.nome}</strong> — <em>${t.azione}</em> (priorità: ${t.priorita})<br/>${t.motivazione}<br/><strong>Cosa fare:</strong> ${t.cosa_fare}</div>`).join("");
+    document.getElementById("print-area").innerHTML=`
+      <h2>Piano d'Azione Portafoglio</h2>
+      <div class="pm">Data: ${entry.data} &nbsp;|&nbsp; Valore: ${entry.totale}</div>
+      <div class="pb">
+        <p style="font-style:italic;color:#555;margin-bottom:12px">${j.sommario||""}</p>
+        ${j.ribilanciamento?`<p style="margin-bottom:12px"><strong>Ribilanciamento:</strong> ${j.ribilanciamento}</p>`:""}
+        <strong>Titoli</strong><div style="margin-top:8px">${titoliHTML}</div>
+      </div>
+      <div class="pf">Portfolio Analyzer · ${new Date().toLocaleDateString("it-IT")} · Solo scopo informativo, non costituisce consulenza finanziaria.</div>`;
+    window.print();
+  };
+
   const run=async()=>{
-    setLoading(true);setActions(null);setExpanded(null);
+    setLoading(true);setActions(null);setExpanded(null);setViewIdx(null);
     const righe=holdings.filter(h=>h.controvaloreAttuale>0).map((h,i)=>{
       const nome=h.nome.length>40?h.nome.slice(0,40):h.nome;
       const peso=totalValue>0?(h.controvaloreAttuale/totalValue*100).toFixed(1):0;
@@ -655,12 +725,15 @@ function AzioniTab({holdings,totalValue,byCat}){
       const text=await callAI("Sei un consulente finanziario italiano. Rispondi SOLO con JSON valido, senza testo prima o dopo.",`Portafoglio BILANCIATO, aprile 2026. Totale €${Math.round(totalValue).toLocaleString("it-IT")}. Azionario ${pAz}% (target 50-65%), Obbligazionario ${pOb}% (target 30-45%). Contesto: tensioni USA-Cina, BCE ferma.\n\nTITOLI:\n${righe}\n\nPer ogni titolo azione (vendi/monitora/mantieni/incrementa/switch) e priorità (alta/media/bassa). JSON: {"sommario":"...","ribilanciamento":"...","titoli":[{"nome":"...","azione":"mantieni","priorita":"media","motivazione":"...","cosa_fare":"..."}]}`,4000);
       const json=extractJSON(text);
       if(!json.titoli||!Array.isArray(json.titoli))throw new Error("Struttura non valida");
-      setActions(json);
+      setActions(json);saveS(json);
     }catch(e){setActions({error:`Errore: ${e.message}`});}
     setLoading(false);
   };
-  const tf=actions?.titoli?.filter(t=>filterTipo==="tutti"||t.azione===filterTipo)??[];
-  const cnt=actions?.titoli?Object.keys(AZIONE_META).reduce((a,k)=>{a[k]=actions.titoli.filter(t=>t.azione===k).length;return a;},{}):{}; 
+
+  const displayActions=viewIdx!==null?storico[viewIdx]?.json:actions;
+  const tf=displayActions?.titoli?.filter(t=>filterTipo==="tutti"||t.azione===filterTipo)??[];
+  const cnt=displayActions?.titoli?Object.keys(AZIONE_META).reduce((a,k)=>{a[k]=displayActions.titoli.filter(t=>t.azione===k).length;return a;},{}):{}; 
+
   return(<div>
     <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
       {[{l:"Azionario",v:pAz+"%",s:"target 50–65%",a:pAz>65||pAz<50},{l:"Obbligazionario",v:pOb+"%",s:"target 30–45%",a:pOb>45||pOb<30}].map((c,i)=>(
@@ -675,15 +748,16 @@ function AzioniTab({holdings,totalValue,byCat}){
         <div><div style={{fontWeight:600,fontSize:15}}>Piano d'Azione AI</div><div style={{fontSize:11,color:"#888"}}>{holdings.filter(h=>h.controvaloreAttuale>0).length} titoli da analizzare</div></div>
         <button onClick={run} disabled={loading} style={{padding:"10px 16px",borderRadius:10,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:loading?"not-allowed":"pointer",fontSize:13,fontWeight:500}}>{loading?"In corso…":actions?"Aggiorna":"Avvia"}</button>
       </div>
-      {!actions&&!loading&&<div style={{fontSize:13,color:"#888",fontStyle:"italic",marginTop:12}}>Clicca "Avvia" per ottenere il piano d'azione titolo per titolo.</div>}
+      {!displayActions&&!loading&&<div style={{fontSize:13,color:"#888",fontStyle:"italic",marginTop:12}}>Clicca "Avvia" per ottenere il piano d'azione titolo per titolo.</div>}
       {loading&&<div style={{fontSize:13,color:"#888",marginTop:12}}>Gemini sta analizzando ogni titolo…</div>}
-      {actions?.error&&<div style={{color:"#D85A30",fontSize:13,marginTop:12}}>{actions.error}</div>}
-      {actions&&!actions.error&&(
+      {displayActions?.error&&<div style={{color:"#D85A30",fontSize:13,marginTop:12}}>{displayActions.error}</div>}
+      {displayActions&&!displayActions.error&&(
         <div style={{marginTop:16,paddingTop:16,borderTop:"0.5px solid #2a2a3e"}}>
-          <div style={{fontSize:13,color:"#aaa",fontStyle:"italic",marginBottom:12}}>{actions.sommario}</div>
-          {actions.ribilanciamento&&<div style={{background:"#12121e",border:"0.5px solid #7F77DD40",borderRadius:10,padding:"10px 12px",marginBottom:14,fontSize:13}}><span style={{fontWeight:600,color:"#7F77DD",marginRight:6}}>Ribilanciamento:</span><span style={{color:"#aaa"}}>{actions.ribilanciamento}</span></div>}
+          {viewIdx!==null&&<div style={{fontSize:11,color:"#888",marginBottom:10,fontStyle:"italic"}}>📅 {storico[viewIdx]?.data} · {storico[viewIdx]?.totale}</div>}
+          <div style={{fontSize:13,color:"#aaa",fontStyle:"italic",marginBottom:12}}>{displayActions.sommario}</div>
+          {displayActions.ribilanciamento&&<div style={{background:"#12121e",border:"0.5px solid #7F77DD40",borderRadius:10,padding:"10px 12px",marginBottom:14,fontSize:13}}><span style={{fontWeight:600,color:"#7F77DD",marginRight:6}}>Ribilanciamento:</span><span style={{color:"#aaa"}}>{displayActions.ribilanciamento}</span></div>}
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            <button onClick={()=>setFilterTipo("tutti")} style={{padding:"5px 12px",borderRadius:20,fontSize:12,cursor:"pointer",border:filterTipo==="tutti"?"1px solid #888":"0.5px solid #333",background:filterTipo==="tutti"?"#2a2a3e":"transparent",color:"white"}}>Tutti ({actions.titoli?.length??0})</button>
+            <button onClick={()=>setFilterTipo("tutti")} style={{padding:"5px 12px",borderRadius:20,fontSize:12,cursor:"pointer",border:filterTipo==="tutti"?"1px solid #888":"0.5px solid #333",background:filterTipo==="tutti"?"#2a2a3e":"transparent",color:"white"}}>Tutti ({displayActions.titoli?.length??0})</button>
             {Object.entries(AZIONE_META).filter(([k])=>(cnt[k]??0)>0).map(([key,meta])=>(
               <button key={key} onClick={()=>setFilterTipo(key)} style={{padding:"5px 12px",borderRadius:20,fontSize:12,cursor:"pointer",border:filterTipo===key?`1px solid ${meta.color}`:`0.5px solid ${meta.color}40`,background:filterTipo===key?meta.bg:"transparent",color:meta.color}}>
                 {meta.icon} {meta.label} ({cnt[key]})
@@ -693,6 +767,26 @@ function AzioniTab({holdings,totalValue,byCat}){
         </div>
       )}
     </Section>
+    {/* Storico */}
+    {storico.length>0&&(
+      <Section>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+          <div style={{fontWeight:600,fontSize:14}}>Storico ({storico.length}/5)</div>
+          <button onClick={delAll} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>Cancella tutto</button>
+        </div>
+        {storico.map((e,i)=>(
+          <div key={e.id} onClick={()=>{setViewIdx(viewIdx===i?null:i);setExpanded(null);}} style={{padding:"12px",borderRadius:10,marginBottom:8,background:viewIdx===i?"#2a2a3e":"#12121e",border:viewIdx===i?"0.5px solid #7F77DD":"0.5px solid #2a2a3e",cursor:"pointer"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div><div style={{fontSize:13,fontWeight:500}}>{e.data}</div><div style={{fontSize:11,color:"#888",marginTop:2}}>{e.totale} · {e.json?.titoli?.length??0} titoli</div></div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={ev=>{ev.stopPropagation();exportPDF(e);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #1D9E7540",background:"transparent",color:"#1D9E75",cursor:"pointer",fontSize:12}}>PDF</button>
+                <button onClick={ev=>{ev.stopPropagation();delE(e.id);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>✕</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </Section>
+    )}
     {tf.length>0&&(<div style={{display:"flex",flexDirection:"column",gap:8}}>
       {tf.map((t,i)=>{
         const meta=AZIONE_META[t.azione]??AZIONE_META.mantieni;
@@ -700,13 +794,13 @@ function AzioniTab({holdings,totalValue,byCat}){
         const open=expanded===i;
         return(<div key={i} onClick={()=>setExpanded(open?null:i)} style={{background:"#1e2235",border:`0.5px solid ${meta.color}30`,borderRadius:12,overflow:"hidden",cursor:"pointer"}}>
           <div style={{padding:"14px"}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:open?0:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
               <div style={{padding:"4px 10px",borderRadius:6,background:meta.bg,color:meta.color,fontSize:12,fontWeight:600,flexShrink:0}}>{meta.icon} {meta.label}</div>
               <div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:t.priorita==="alta"?"#D85A30":t.priorita==="media"?"#EF9F27":"#888"}}/>
               <div style={{flex:1,fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.nome}</div>
               <div style={{fontSize:12,color:"#888",flexShrink:0}}>{open?"▲":"▼"}</div>
             </div>
-            {h&&<div style={{fontSize:13,color:"#888",marginTop:6}}>{fmtEur(h.controvaloreAttuale)} · {totalValue>0?(h.controvaloreAttuale/totalValue*100).toFixed(1):"—"}% del portafoglio</div>}
+            {h&&<div style={{fontSize:13,color:"#888",marginTop:6}}>{fmtEur(h.controvaloreAttuale)} · {totalValue>0?(h.controvaloreAttuale/totalValue*100).toFixed(1):"—"}%</div>}
           </div>
           {open&&(<div style={{padding:"0 14px 14px",borderTop:"0.5px solid #2a2a3e"}}>
             <div style={{paddingTop:12,display:"flex",flexDirection:"column",gap:12}}>
