@@ -17,10 +17,11 @@ table{border-collapse:collapse;}
   body{background:white;color:black;}
   #print-area{display:block!important;color:black;padding:2rem;}
   #app-root{display:none!important;}
-  #print-area h2{font-size:20px;margin-bottom:0.5rem;}
-  #print-area .pm{font-size:13px;color:#555;margin-bottom:1.5rem;}
-  #print-area .pb{font-size:14px;line-height:1.8;}
-  #print-area .pf{margin-top:2rem;font-size:11px;color:#888;border-top:1px solid #ccc;padding-top:0.5rem;}
+  #print-area h2{font-size:20px;margin-bottom:0.5rem;color:#1D9E75;}
+  #print-area .pm{font-size:12px;color:#555;margin-bottom:1.5rem;}
+  #print-area .pb{font-size:13px;line-height:1.7;}
+  #print-area .checks{background:#f0f9f4;border-left:4px solid #1D9E75;padding:12px;margin-bottom:16px;font-size:11px;color:#1a4a35;}
+  #print-area .pf{margin-top:2rem;font-size:10px;color:#888;border-top:1px solid #ccc;padding-top:0.5rem;}
 }
 </style>
 </head>
@@ -28,105 +29,224 @@ table{border-collapse:collapse;}
 <div id="print-area" style="display:none"></div>
 <div id="app-root"></div>
 <script type="text/babel" data-presets="react">
-const{useState,useCallback,useRef,useEffect}=React;
+const{useState,useCallback,useRef,useEffect,useMemo}=React;
 
-const BANKS={MD:{name:"Mediolanum",color:"#1D9E75"},BPER:{name:"BPER Banca",color:"#378ADD"},PI:{name:"Poste Italiane",color:"#D85A30"}};
+// ─── COSTANTI ────────────────────────────────────────────────────────────────
+const APP_VERSION="3.0";
+const DATA_RIF="2026-04-22";  // data riferimento valori MD
+const DATA_RIF_BPER="2026-04-29";
+const DATA_RIF_PI="2026-04-29";
+
+const BANKS={
+  MD:{name:"Mediolanum",color:"#1D9E75",dataRif:DATA_RIF},
+  BPER:{name:"BPER Banca",color:"#378ADD",dataRif:DATA_RIF_BPER},
+  PI:{name:"Poste Italiane",color:"#D85A30",dataRif:DATA_RIF_PI},
+};
 const CAT_COLORS={"Azionari internazionali":"#7F77DD","Azionari settoriali":"#1D9E75","Obbligazionario Convertibili":"#378ADD","Obbligazioni paesi emergenti":"#EF9F27","Obbligazioni High Yield":"#D85A30","Obbligazionari diversified":"#5DCAA5","Azionari paesi emergenti":"#D4537E","Azionari nord america":"#6399BB","assicurativo":"#888780","Monetario":"#A0A0B0"};
-const BENCHMARK={"Azionari internazionali":{ticker:"URTH"},"Azionari settoriali":{ticker:"URTH"},"Azionari nord america":{ticker:"SPY"},"Azionari paesi emergenti":{ticker:"EEM"},"Obbligazionari diversified":{ticker:"AGG"},"Obbligazioni High Yield":{ticker:"HYG"},"Obbligazioni paesi emergenti":{ticker:"EMB"},"Obbligazionario Convertibili":{ticker:"CWB"},"assicurativo":{ticker:null},"Monetario":{ticker:null}};
+const BENCHMARK={"Azionari internazionali":{ticker:"URTH",stooq:"urth.us"},"Azionari settoriali":{ticker:"URTH",stooq:"urth.us"},"Azionari nord america":{ticker:"SPY",stooq:"spy.us"},"Azionari paesi emergenti":{ticker:"EEM",stooq:"eem.us"},"Obbligazionari diversified":{ticker:"AGG",stooq:"agg.us"},"Obbligazioni High Yield":{ticker:"HYG",stooq:"hyg.us"},"Obbligazioni paesi emergenti":{ticker:"EMB",stooq:"emb.us"},"Obbligazionario Convertibili":{ticker:"CWB",stooq:"cwb.us"},"assicurativo":{ticker:null},"Monetario":{ticker:null}};
 const CAT_REND={"Azionari internazionali":9.5,"Azionari settoriali":7.0,"Azionari paesi emergenti":6.0,"Azionari nord america":10.0,"Obbligazionario Convertibili":4.5,"Obbligazioni paesi emergenti":3.5,"Obbligazioni High Yield":5.5,"Obbligazionari diversified":3.0,"assicurativo":4.0,"Monetario":0.5};
 const AZIONE_META={vendi:{color:"#D85A30",bg:"#D85A3015",label:"Riduci/Vendi",icon:"↓"},monitora:{color:"#EF9F27",bg:"#EF9F2715",label:"Monitora",icon:"◎"},mantieni:{color:"#888780",bg:"#88878015",label:"Mantieni",icon:"→"},incrementa:{color:"#1D9E75",bg:"#1D9E7515",label:"Incrementa",icon:"↑"},switch:{color:"#7F77DD",bg:"#7F77DD15",label:"Switch",icon:"⇄"}};
-const DATA_RIF="2026-04-22";
 
+// ─── DATI PORTAFOGLIO ────────────────────────────────────────────────────────
+// MD - Dati estratti dal documento Mediolanum "Situazione Investimenti" del 22/04/2026
+// PMC = Capitale Investito / Quote (calcolato dai dati ufficiali del documento)
+// Polizza ILP: P&L lordo (8.598,50)
 const MD_DATA=[
-  {nome:"MBB convertibile strategy collection LHA EUR PIC",isin:"IE00B9CQ9016",quantita:1574.83,prezzoCarico:null,controvaloreAttuale:9932.44,categoria:"Obbligazionario Convertibili",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"MBB Emerging markets fixed income LHA EUR PIC",isin:"IE00BJYLJD74",quantita:2165.71,prezzoCarico:null,controvaloreAttuale:9769.52,categoria:"Obbligazioni paesi emergenti",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"MBB Global High Yield LHA EUR",isin:"IE00B04KP668",quantita:1287.64,prezzoCarico:null,controvaloreAttuale:10342.32,categoria:"Obbligazioni High Yield",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"MBB Mediolanum global sustainable bond LA",isin:"IE000WHTCTA",quantita:2938.48,prezzoCarico:null,controvaloreAttuale:14815.81,categoria:"Obbligazionari diversified",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"MBB circular economy opportunities LHA EUR PIC",isin:"IE000H4P2KR2",quantita:3770.74,prezzoCarico:null,controvaloreAttuale:18657.64,categoria:"Azionari settoriali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"MBB Dynamic international value opportunity LHA EUR PIC",isin:"IE00BYZ2YB75",quantita:2237.31,prezzoCarico:null,controvaloreAttuale:18815.74,categoria:"Azionari internazionali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"MBB global leaders LHA EUR PIC",isin:"IE00BJYLJ930",quantita:2448.96,prezzoCarico:7.146,controvaloreAttuale:17500.30,categoria:"Azionari internazionali",banca:"MD",plusMinus:1342.32,rendimentoAnnuo:13.774},
-  {nome:"MBB Mediolanum Morgan Stanley global selection LHA EUR PIC",isin:"IE00B2NLMV86",quantita:1622.86,prezzoCarico:8.41,controvaloreAttuale:18257.13,categoria:"Azionari internazionali",banca:"MD",plusMinus:1345.12,rendimentoAnnuo:11.637},
-  {nome:"Challenge energy opportunities LA EUR PAC",isin:"IE0004460683",quantita:590.51,prezzoCarico:null,controvaloreAttuale:5845.43,categoria:"Azionari settoriali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Challenge healthcare opportunities LA EUR PAC",isin:"IE0004479642",quantita:668.40,prezzoCarico:null,controvaloreAttuale:4392.07,categoria:"Azionari settoriali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Challenge industrials and materials opportunities LA EUR PAC",isin:"IE0004462408",quantita:397.41,prezzoCarico:null,controvaloreAttuale:6276.74,categoria:"Azionari settoriali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Challenge international equity fund LHA EUR PAC",isin:"IE00B60DM373",quantita:420.46,prezzoCarico:null,controvaloreAttuale:6076.50,categoria:"Azionari internazionali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Challenge north american equity fund LHA EUR PAC",isin:"IE00B6072284",quantita:317.20,prezzoCarico:19.207,controvaloreAttuale:6092.48,categoria:"Azionari nord america",banca:"MD",plusMinus:-108.43,rendimentoAnnuo:-0.936},
-  {nome:"MBB global small cap equity LA EUR PIC",isin:"IE00BJYLJG06",quantita:895.13,prezzoCarico:null,controvaloreAttuale:6222.95,categoria:"Azionari internazionali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Mediolanum energy transition L PIC",isin:"IE000V4RVQ80",quantita:1143.91,prezzoCarico:null,controvaloreAttuale:6323.52,categoria:"Azionari settoriali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Mediolanum future sustainable nutrition LA EUR PIC",isin:"IE0000DBVC71",quantita:1071.17,prezzoCarico:null,controvaloreAttuale:4246.11,categoria:"Azionari settoriali",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Mediolanum global equity style selection LA PIC",isin:"IE000TCXNA99",quantita:1666.89,prezzoCarico:6.365,controvaloreAttuale:10609.74,categoria:"Azionari internazionali",banca:"MD",plusMinus:599.89,rendimentoAnnuo:5.019},
-  {nome:"Mediolanum India opportunities LA PIC",isin:"IE000K6M6613",quantita:1481.03,prezzoCarico:5.635,controvaloreAttuale:8345.59,categoria:"Azionari paesi emergenti",banca:"MD",plusMinus:-1654.10,rendimentoAnnuo:-13.611},
-  {nome:"Polizza Mediolanum Intelligent Life Plan",isin:null,quantita:1,prezzoCarico:35000,controvaloreAttuale:43598.50,categoria:"assicurativo",banca:"MD",plusMinus:8619.11,rendimentoAnnuo:11.748},
-  {nome:"Conto Corrente Mediolanum",isin:null,quantita:1,prezzoCarico:null,controvaloreAttuale:5790,categoria:"Monetario",banca:"MD",plusMinus:null,rendimentoAnnuo:null},
-];
-const BPER_DATA=[
-  {nome:"Arca R Val Re 27 2 R",isin:"IT0005483430",quantita:5999.300,prezzoCarico:5.000,controvaloreAttuale:36835.70,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Arca Ri Div Bond P",isin:"IT0000380029",quantita:2137.921,prezzoCarico:11.286,controvaloreAttuale:27361.11,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Arca Te",isin:"IT0000384641",quantita:996.922,prezzoCarico:23.680,controvaloreAttuale:26493.20,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Arca Val Re 27 3 R",isin:"IT0005494643",quantita:3999.300,prezzoCarico:5.000,controvaloreAttuale:25579.52,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Bper GI Cv Bond",isin:"LU0079194363",quantita:66.871,prezzoCarico:199.020,controvaloreAttuale:18348.06,categoria:"Obbligazionario Convertibili",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Bper Global Bond",isin:"LU0087341626",quantita:38.209,prezzoCarico:169.102,controvaloreAttuale:6403.45,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Etica Bilanciato P",isin:"IT0003409213",quantita:1296.056,prezzoCarico:13.513,controvaloreAttuale:20371.41,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Etica Red Bill Crd P",isin:"IT0005117558",quantita:4425.670,prezzoCarico:4.958,controvaloreAttuale:21203.38,categoria:"Obbligazioni paesi emergenti",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Arca Bb",isin:"IT0000380003",quantita:293.76,prezzoCarico:51.403,controvaloreAttuale:12163.54,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Arca Bond Corp",isin:"IT0003021990",quantita:80.350,prezzoCarico:9.889,controvaloreAttuale:2446.12,categoria:"Obbligazioni High Yield",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Arca Bond P Emerg P",isin:"IT0001248373",quantita:20.008,prezzoCarico:18.098,controvaloreAttuale:1607.64,categoria:"Obbligazioni paesi emergenti",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Arca Ced Att 26 R",isin:"IT0005494601",quantita:4999.300,prezzoCarico:5.203,controvaloreAttuale:26061.36,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Arca Dinamico P",isin:"IT0003995239",quantita:1336.451,prezzoCarico:9.143,controvaloreAttuale:12219.17,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Arca Equilibrio P",isin:"IT0003956197",quantita:1921.234,prezzoCarico:7.365,controvaloreAttuale:14149.89,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Arca Ft Ced Pl 30 3R",isin:"IT0005635294",quantita:3997.65,prezzoCarico:5.011,controvaloreAttuale:20040.49,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Arca Obl Europa",isin:"IT0000124824",quantita:1911.765,prezzoCarico:13.420,controvaloreAttuale:25655.89,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Arca Oft Uso 30 R",isin:"IT0005653237",quantita:1999.300,prezzoCarico:5.126,controvaloreAttuale:10248.41,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Arca Oxy Plus 50 Acc",isin:"IT0005106718",quantita:1642.763,prezzoCarico:6.794,controvaloreAttuale:11160.93,categoria:"Azionari internazionali",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-  {nome:"Conto Corrente BPER",isin:null,quantita:1,prezzoCarico:null,controvaloreAttuale:7746.51,categoria:"Monetario",banca:"BPER",plusMinus:null,rendimentoAnnuo:null},
-];
-const PI_DATA=[
-  {nome:"Poste Domani Per Te Plus",isin:null,quantita:1,prezzoCarico:null,controvaloreAttuale:20587.73,categoria:"assicurativo",banca:"PI",plusMinus:null,rendimentoAnnuo:0.77},
-  {nome:"Poste Progetto Dinamico Bonus",isin:null,quantita:1,prezzoCarico:null,controvaloreAttuale:33402.21,categoria:"assicurativo",banca:"PI",plusMinus:null,rendimentoAnnuo:2.64},
-  {nome:"Libretto Smart Poste",isin:null,quantita:1,prezzoCarico:null,controvaloreAttuale:2335.65,categoria:"Monetario",banca:"PI",plusMinus:null,rendimentoAnnuo:null},
+  {nome:"MBB convertibile strategy collection LHA EUR PIC",isin:"IE00B9CQ9016",quantita:1574.828,prezzoCarico:5.080,controvaloreAttuale:9932.44,categoria:"Obbligazionario Convertibili",banca:"MD",plusMinus:1932.36,rendimentoAnnuo:6.879,fonte:"Mediolanum 22/04/2026"},
+  {nome:"MBB Emerging markets fixed income LHA EUR PIC",isin:"IE00BJYLJD74",quantita:2165.711,prezzoCarico:3.694,controvaloreAttuale:9769.52,categoria:"Obbligazioni paesi emergenti",banca:"MD",plusMinus:1769.60,rendimentoAnnuo:6.300,fonte:"Mediolanum 22/04/2026"},
+  {nome:"MBB Global High Yield LHA EUR",isin:"IE00B04KP668",quantita:1287.639,prezzoCarico:6.990,controvaloreAttuale:10342.32,categoria:"Obbligazioni High Yield",banca:"MD",plusMinus:1342.32,rendimentoAnnuo:4.248,fonte:"Mediolanum 22/04/2026"},
+  {nome:"MBB Mediolanum global sustainable bond LA",isin:"IE000WHTCTA",quantita:2938.479,prezzoCarico:5.105,controvaloreAttuale:14815.81,categoria:"Obbligazionari diversified",banca:"MD",plusMinus:-184.19,rendimentoAnnuo:-0.825,fonte:"Mediolanum 22/04/2026"},
+  {nome:"MBB circular economy opportunities LHA EUR PIC",isin:"IE000H4P2KR2",quantita:3770.744,prezzoCarico:4.509,controvaloreAttuale:18657.64,categoria:"Azionari settoriali",banca:"MD",plusMinus:1653.92,rendimentoAnnuo:4.519,fonte:"Mediolanum 22/04/2026"},
+  {nome:"MBB Dynamic international value opportunity LHA EUR PIC",isin:"IE00BYZ2YB75",quantita:2237.306,prezzoCarico:6.209,controvaloreAttuale:18815.74,categoria:"Azionari internazionali",banca:"MD",plusMinus:4924.75,rendimentoAnnuo:15.189,fonte:"Mediolanum 22/04/2026"},
+  {nome:"MBB global leaders LHA EUR PIC",isin:"IE00BJYLJ930",quantita:2448.964,prezzoCarico:5.912,controvaloreAttuale:17500.30,categoria:"Azionari internazionali",banca:"MD",plusMinus:3022.81,rendimentoAnnuo:8.878,fonte:"Mediolanum 22/04/2026"},
+  {nome:"MBB Mediolanum Morgan Stanley global selection LHA EUR PIC",isin:"IE00B2NLMV86",quantita:1622.856,prezzoCarico:9.232,controvaloreAttuale:18257.13,categoria:"Azionari internazionali",banca:"MD",plusMinus:3275.77,rendimentoAnnuo:9.870,fonte:"Mediolanum 22/04/2026"},
+  {nome:"Challenge energy opportunities LA EUR PAC",isin:"IE0004460683",quantita:590.507,prezzoCarico:7.621,controvaloreAttuale:5845.43,categoria:"Azionari settoriali",banca:"MD",plusMinus:1345.12,rendimentoAnnuo:11.637,fonte:"Mediolanum 22/04/2026"},
+  {nome:"Challenge healthcare opportunities LA EUR PAC",isin:"IE0004479642",quantita:668.402,prezzoCarico:6.733,controvaloreAttuale:4392.07,categoria:"Azionari settoriali",banca:"MD",plusMinus:-108.24,rendimentoAnnuo:-0.936,fonte:"Mediolanum 22/04/2026"},
+  {nome:"Challenge industrials and materials opportunities LA EUR PAC",isin:"IE0004462408",quantita:397.413,prezzoCarico:11.324,controvaloreAttuale:6276.74,categoria:"Azionari settoriali",banca:"MD",plusMinus:1776.43,rendimentoAnnuo:15.369,fonte:"Mediolanum 22/04/2026"},
+  {nome:"Challenge international equity fund LHA EUR PAC",isin:"IE00B60DM373",quantita:420.461,prezzoCarico:10.703,controvaloreAttuale:6076.50,categoria:"Azionari internazionali",banca:"MD",plusMinus:1576.19,rendimentoAnnuo:13.636,fonte:"Mediolanum 22/04/2026"},
+  {nome:"Challenge north american equity fund LHA EUR PAC",isin:"IE00B6072284",quantita:317.201,prezzoCarico:14.188,controvaloreAttuale:6092.48,categoria:"Azionari nord america",banca:"MD",plusMinus:1592.17,rendimentoAnnuo:13.774,fonte:"Mediolanum 22/04/2026"},
+  {nome:"MBB global small cap equity LA EUR PIC",isin:"IE00BJYLJG06",quantita:895.131,prezzoCarico:5.586,controvaloreAttuale:6222.95,categoria:"Azionari internazionali",banca:"MD",plusMinus:1222.49,rendimentoAnnuo:20.116,fonte:"Mediolanum 22/04/2026"},
+  {nome:"Mediolanum energy transition L PIC",isin:"IE000V4RVQ80",quantita:1143.908,prezzoCarico:4.371,controvaloreAttuale:6323.52,categoria:"Azionari settoriali",banca:"MD",plusMinus:1323.52,rendimentoAnnuo:21.781,fonte:"Mediolanum 22/04/2026"},
+  {nome:"Mediolanum future sustainable nutrition LA EUR PIC",isin:"IE0000DBVC71",quantita:1071.169,prezzoCarico:4.668,controvaloreAttuale:4246.11,categoria:"Azionari settoriali",banca:"MD",plusMinus:-753.89,rendimentoAnnuo:-12.407,fonte:"Mediolanum 22/04/2026"},
+  {nome:"Mediolanum global equity style selection LA PIC",isin:"IE000TCXNA99",quantita:1666.888,prezzoCarico:5.999,controvaloreAttuale:10609.74,categoria:"Azionari internazionali",banca:"MD",plusMinus:609.89,rendimentoAnnuo:5.019,fonte:"Mediolanum 22/04/2026"},
+  {nome:"Mediolanum India opportunities LA PIC",isin:"IE000K6M6613",quantita:1481.027,prezzoCarico:6.752,controvaloreAttuale:8345.59,categoria:"Azionari paesi emergenti",banca:"MD",plusMinus:-1654.10,rendimentoAnnuo:-13.611,fonte:"Mediolanum 22/04/2026"},
+  {nome:"Polizza Mediolanum Intelligent Life Plan",isin:null,quantita:1,prezzoCarico:35000,controvaloreAttuale:43598.50,categoria:"assicurativo",banca:"MD",plusMinus:8598.50,rendimentoAnnuo:11.748,fonte:"Mediolanum 22/04/2026"},
+  {nome:"Conto Corrente Mediolanum",isin:null,quantita:1,prezzoCarico:5790,controvaloreAttuale:5790,categoria:"Monetario",banca:"MD",plusMinus:0,rendimentoAnnuo:0,fonte:"Mediolanum 22/04/2026"},
 ];
 
+// BPER - Dati estratti dal rendiconto BPER del 29/04/2026
+// plusMinus = (Prezzo - PMC) × Quantità
+// rendimentoTotale = (plusMinus / capitaleInvestito) × 100  [NON annualizzato]
+const BPER_DATA=[
+  {nome:"Arca R Val Re 27 2 R",isin:"IT0005483430",quantita:5999.300,prezzoCarico:5.000,prezzoAttuale:6.140,controvaloreAttuale:36835.70,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:6839.20,rendimentoTotale:22.80,fonte:"BPER 29/04/2026"},
+  {nome:"Arca Ri Div Bond P",isin:"IT0000380029",quantita:2137.921,prezzoCarico:11.286,prezzoAttuale:12.798,controvaloreAttuale:27361.11,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:3232.74,rendimentoTotale:13.40,fonte:"BPER 29/04/2026"},
+  {nome:"Arca Te",isin:"IT0000384641",quantita:996.922,prezzoCarico:23.680,prezzoAttuale:26.575,controvaloreAttuale:26493.20,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:2886.10,rendimentoTotale:12.22,fonte:"BPER 29/04/2026"},
+  {nome:"Arca Val Re 27 3 R",isin:"IT0005494643",quantita:3999.300,prezzoCarico:5.000,prezzoAttuale:6.396,controvaloreAttuale:25579.52,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:5583.02,rendimentoTotale:27.92,fonte:"BPER 29/04/2026"},
+  {nome:"Bper GI Cv Bond",isin:"LU0079194363",quantita:66.871,prezzoCarico:199.020,prezzoAttuale:274.380,controvaloreAttuale:18348.06,categoria:"Obbligazionario Convertibili",banca:"BPER",plusMinus:5039.61,rendimentoTotale:37.86,fonte:"BPER 29/04/2026"},
+  {nome:"Bper Global Bond",isin:"LU0087341626",quantita:38.209,prezzoCarico:169.102,prezzoAttuale:167.590,controvaloreAttuale:6403.45,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:-57.78,rendimentoTotale:-0.89,fonte:"BPER 29/04/2026"},
+  {nome:"Etica Bilanciato P",isin:"IT0003409213",quantita:1296.056,prezzoCarico:13.513,prezzoAttuale:15.718,controvaloreAttuale:20371.41,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:2857.80,rendimentoTotale:16.32,fonte:"BPER 29/04/2026"},
+  {nome:"Etica Red Bill Crd P",isin:"IT0005117558",quantita:4425.670,prezzoCarico:4.958,prezzoAttuale:4.791,controvaloreAttuale:21203.38,categoria:"Obbligazioni paesi emergenti",banca:"BPER",plusMinus:-739.09,rendimentoTotale:-3.37,fonte:"BPER 29/04/2026"},
+  {nome:"Arca Bb",isin:"IT0000380003",quantita:203.176,prezzoCarico:51.403,prezzoAttuale:59.867,controvaloreAttuale:12163.54,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:1719.69,rendimentoTotale:16.46,fonte:"BPER 29/04/2026"},
+  {nome:"Arca Bond Corp",isin:"IT0003021990",quantita:253.432,prezzoCarico:9.889,prezzoAttuale:9.652,controvaloreAttuale:2446.12,categoria:"Obbligazioni High Yield",banca:"BPER",plusMinus:-60.06,rendimentoTotale:-2.40,fonte:"BPER 29/04/2026"},
+  {nome:"Arca Bond P Emerg P",isin:"IT0001248373",quantita:80.350,prezzoCarico:18.098,prezzoAttuale:20.008,controvaloreAttuale:1607.64,categoria:"Obbligazioni paesi emergenti",banca:"BPER",plusMinus:153.47,rendimentoTotale:10.55,fonte:"BPER 29/04/2026"},
+  {nome:"Arca Ced Att 26 R",isin:"IT0005494601",quantita:4999.300,prezzoCarico:4.923,prezzoAttuale:5.203,controvaloreAttuale:26011.36,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:1399.80,rendimentoTotale:5.69,fonte:"BPER 29/04/2026"},
+  {nome:"Arca Dinamico P",isin:"IT0003995239",quantita:1336.451,prezzoCarico:7.745,prezzoAttuale:9.143,controvaloreAttuale:12219.17,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:1868.27,rendimentoTotale:18.05,fonte:"BPER 29/04/2026"},
+  {nome:"Arca Equilibrio P",isin:"IT0003956197",quantita:1921.234,prezzoCarico:6.438,prezzoAttuale:7.365,controvaloreAttuale:14149.89,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:1781.38,rendimentoTotale:14.40,fonte:"BPER 29/04/2026"},
+  {nome:"Arca Ft Ced Pl 30 3R",isin:"IT0005635294",quantita:3999.300,prezzoCarico:5.000,prezzoAttuale:5.011,controvaloreAttuale:20040.49,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:43.99,rendimentoTotale:0.22,fonte:"BPER 29/04/2026"},
+  {nome:"Arca Obl Europa",isin:"IT0000124824",quantita:1911.765,prezzoCarico:11.584,prezzoAttuale:13.420,controvaloreAttuale:25655.89,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:3510.00,rendimentoTotale:15.85,fonte:"BPER 29/04/2026"},
+  {nome:"Arca Oft Uso 30 R",isin:"IT0005653237",quantita:1999.300,prezzoCarico:5.000,prezzoAttuale:5.126,controvaloreAttuale:10248.41,categoria:"Obbligazionari diversified",banca:"BPER",plusMinus:251.91,rendimentoTotale:2.52,fonte:"BPER 29/04/2026"},
+  {nome:"Arca Oxy Plus 50 Acc",isin:"IT0005106718",quantita:1642.763,prezzoCarico:6.083,prezzoAttuale:6.794,controvaloreAttuale:11160.93,categoria:"Azionari internazionali",banca:"BPER",plusMinus:1167.96,rendimentoTotale:11.69,fonte:"BPER 29/04/2026"},
+  {nome:"Conto Corrente BPER",isin:null,quantita:1,prezzoCarico:7746.51,controvaloreAttuale:7746.51,categoria:"Monetario",banca:"BPER",plusMinus:0,rendimentoTotale:0,fonte:"BPER 29/04/2026"},
+];
+
+// PI - Poste Italiane (rendimentoAnnuo dichiarato; plusMinus calcolato come performance × valore)
+const PI_DATA=[
+  {nome:"Poste Domani Per Te Plus",isin:null,quantita:1,prezzoCarico:20000,controvaloreAttuale:20587.73,categoria:"assicurativo",banca:"PI",plusMinus:587.73,rendimentoAnnuo:0.77,fonte:"BancoPosta 29/04/2026"},
+  {nome:"Poste Progetto Dinamico Bonus",isin:null,quantita:1,prezzoCarico:30287.18,controvaloreAttuale:33402.21,categoria:"assicurativo",banca:"PI",plusMinus:3115.03,rendimentoAnnuo:2.64,fonte:"BancoPosta 29/04/2026"},
+  {nome:"Libretto Smart Poste",isin:null,quantita:1,prezzoCarico:2335.65,controvaloreAttuale:2335.65,categoria:"Monetario",banca:"PI",plusMinus:0,rendimentoAnnuo:0,fonte:"BancoPosta 29/04/2026"},
+];
+
+// ─── UTILITY ─────────────────────────────────────────────────────────────────
 const fmt=(n,dec=2)=>n==null||isNaN(n)?"—":new Intl.NumberFormat("it-IT",{minimumFractionDigits:dec,maximumFractionDigits:dec}).format(n);
 const fmtEur=n=>n==null||isNaN(n)?"—":"€"+new Intl.NumberFormat("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
 const fmtPct=n=>n==null||isNaN(n)?"—":(n>=0?"+":"")+fmt(n)+"%";
-const getRend=h=>h.rendimentoAnnuo!=null?h.rendimentoAnnuo:(CAT_REND[h.categoria]??5.0);
+const getRend=h=>h.rendimentoAnnuo!=null?h.rendimentoAnnuo:(h.rendimentoTotale!=null?h.rendimentoTotale:(CAT_REND[h.categoria]??5.0));
+// Restituisce {valore, tipo, label} per visualizzazione differenziata
+const getRendInfo=h=>{
+  if(h.rendimentoAnnuo!=null)return{valore:h.rendimentoAnnuo,tipo:"annuo",label:"Rend. annuo"};
+  if(h.rendimentoTotale!=null)return{valore:h.rendimentoTotale,tipo:"totale",label:"Rend. totale"};
+  return{valore:null,tipo:"none",label:"Rendimento"};
+};
 const isLiq=h=>h.categoria==="Monetario"||h.nome.toLowerCase().includes("conto corrente")||h.nome.toLowerCase().includes("libretto");
+
+// Hash semplice (FNV-1a 32 bit) per firma report
+const dataHash=(data)=>{
+  const s=JSON.stringify(data);
+  let h=2166136261;
+  for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
+  return(h>>>0).toString(16);
+};
 
 const extractJSON=text=>{
   const md=text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if(md){try{return JSON.parse(md[1].trim());}catch(_){}}
   const s=text.indexOf("{");
   if(s!==-1){let d=0;for(let i=s;i<text.length;i++){if(text[i]==="{")d++;else if(text[i]==="}"){ d--;if(d===0)return JSON.parse(text.slice(s,i+1));}}};
-  throw new Error("Nessun JSON trovato");
+  throw new Error("Nessun JSON trovato nella risposta AI");
 };
 
+// Detect italiano (almeno 50% di parole italiane comuni nei primi 500 char)
+const looksItalian=text=>{
+  if(!text||text.length<50)return false;
+  const sample=text.slice(0,500).toLowerCase();
+  const italianWords=["il","la","di","è","che","un","una","per","con","sono","del","della","gli","le","e ","ed ","ma ","non","più","molto","portafoglio","investimento","azionario","obbligazionario","mercato","rischio"];
+  const hits=italianWords.filter(w=>sample.includes(w)).length;
+  return hits>=4;
+};
+
+// ─── API CALL: Gemini AI ─────────────────────────────────────────────────────
 const callAI=async(system,prompt,maxTokens=2000)=>{
   const key=window._aiKey||"";
   if(!key)throw new Error("API Key non inserita — vai in Impostazioni");
   const full=system?system+"\n\n"+prompt:prompt;
   const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${key}`;
-  const body=JSON.stringify({contents:[{parts:[{text:full}]}],generationConfig:{maxOutputTokens:maxTokens,temperature:0.7}});
+  const body=JSON.stringify({contents:[{parts:[{text:full}]}],generationConfig:{maxOutputTokens:maxTokens,temperature:0.5}});
   let resp;
   try{resp=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body});}
   catch(e){resp=await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,{method:"POST",headers:{"Content-Type":"application/json"},body});}
   const data=await resp.json();
   if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
   const text=data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if(!text)throw new Error("Risposta vuota");
+  if(!text)throw new Error("Risposta AI vuota");
   return text;
 };
 
+// Test API key (per controllo dati)
+const testGeminiKey=async()=>{
+  try{
+    const t=await callAI(null,"Rispondi solo con la parola 'OK' in italiano",30);
+    return{ok:true,response:t.trim().slice(0,20)};
+  }catch(e){return{ok:false,error:e.message};}
+};
+
+// ─── PREZZI LIVE: Yahoo + Stooq con doppio check ─────────────────────────────
 async function fetchYahoo(ticker){
   const url=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1mo`;
   const resp=await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+  if(!resp.ok)throw new Error(`Yahoo HTTP ${resp.status}`);
   const data=await resp.json();
   const r=data?.chart?.result?.[0];
-  if(!r)throw new Error("no data");
+  if(!r)throw new Error("Yahoo: nessun dato");
   const ts=r.timestamp,closes=r.indicators.quote[0].close;
   const ref=new Date(DATA_RIF).getTime()/1000;
   let ri=0,md=Infinity;
   ts.forEach((t,i)=>{const d=Math.abs(t-ref);if(d<md){md=d;ri=i;}});
-  return{varPct:((closes[closes.length-1]-closes[ri])/closes[ri])*100};
+  if(closes[ri]==null||closes[closes.length-1]==null)throw new Error("Yahoo: prezzi mancanti");
+  return{priceRef:closes[ri],priceNow:closes[closes.length-1],varPct:((closes[closes.length-1]-closes[ri])/closes[ri])*100,source:"Yahoo Finance"};
+}
+
+async function fetchStooq(stooqTicker){
+  const url=`https://stooq.com/q/d/l/?s=${stooqTicker}&i=d`;
+  const resp=await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+  if(!resp.ok)throw new Error(`Stooq HTTP ${resp.status}`);
+  const text=await resp.text();
+  const lines=text.trim().split("\n");
+  if(lines.length<2)throw new Error("Stooq: dati vuoti");
+  const refDate=DATA_RIF;
+  let priceRef=null,priceNow=null;
+  // header: Date,Open,High,Low,Close,Volume
+  for(let i=1;i<lines.length;i++){
+    const cells=lines[i].split(",");
+    if(cells.length<5)continue;
+    const date=cells[0],close=parseFloat(cells[4]);
+    if(isNaN(close))continue;
+    if(date<=refDate&&priceRef==null)priceRef=close;
+    if(date<=refDate)priceRef=close;
+    priceNow=close;
+  }
+  if(priceRef==null||priceNow==null)throw new Error("Stooq: dati riferimento mancanti");
+  return{priceRef,priceNow,varPct:((priceNow-priceRef)/priceRef)*100,source:"Stooq.com"};
+}
+
+// Doppio check: chiama entrambe le fonti, verifica concordanza
+async function fetchPriceVerified(ticker,stooqTicker){
+  const results={ticker,yahoo:null,stooq:null,ok:false,varPct:null,priceNow:null,warning:null,error:null};
+  const tasks=[];
+  tasks.push(fetchYahoo(ticker).then(r=>{results.yahoo=r;}).catch(e=>{results.yahoo={error:e.message};}));
+  if(stooqTicker)tasks.push(fetchStooq(stooqTicker).then(r=>{results.stooq=r;}).catch(e=>{results.stooq={error:e.message};}));
+  await Promise.all(tasks);
+
+  const ySuccess=results.yahoo&&!results.yahoo.error;
+  const sSuccess=results.stooq&&!results.stooq.error;
+
+  if(!ySuccess&&!sSuccess){
+    results.error="Entrambe le fonti hanno fallito";return results;
+  }
+  if(ySuccess&&sSuccess){
+    // Confronta i due prezzi correnti — tolleranza 1%
+    const diff=Math.abs(results.yahoo.priceNow-results.stooq.priceNow)/results.yahoo.priceNow*100;
+    if(diff<=1){
+      results.ok=true;
+      results.varPct=(results.yahoo.varPct+results.stooq.varPct)/2;
+      results.priceNow=results.yahoo.priceNow;
+      results.checkInfo=`Yahoo: ${results.yahoo.priceNow.toFixed(2)} · Stooq: ${results.stooq.priceNow.toFixed(2)} · diff ${diff.toFixed(2)}%`;
+    }else{
+      results.warning=`Discordanza ${diff.toFixed(2)}% tra Yahoo (${results.yahoo.priceNow.toFixed(2)}) e Stooq (${results.stooq.priceNow.toFixed(2)})`;
+      results.varPct=results.yahoo.varPct;
+      results.priceNow=results.yahoo.priceNow;
+    }
+  }else if(ySuccess){
+    results.ok=true;
+    results.varPct=results.yahoo.varPct;
+    results.priceNow=results.yahoo.priceNow;
+    results.warning=`Solo Yahoo disponibile (Stooq: ${results.stooq?.error||"n/d"})`;
+  }else{
+    results.ok=true;
+    results.varPct=results.stooq.varPct;
+    results.priceNow=results.stooq.priceNow;
+    results.warning=`Solo Stooq disponibile (Yahoo: ${results.yahoo?.error||"n/d"})`;
+  }
+  return results;
 }
 
 function useLivePrices(holdings){
@@ -134,24 +254,332 @@ function useLivePrices(holdings){
   const[loading,setLoading]=useState(false);
   const[lastUpdate,setLastUpdate]=useState(null);
   const[error,setError]=useState(null);
+  const[checkLog,setCheckLog]=useState([]);
   const refresh=useCallback(async()=>{
-    setLoading(true);setError(null);
-    const tickers=[...new Set(holdings.map(h=>BENCHMARK[h.categoria]?.ticker).filter(Boolean))];
-    const res={},errs=[];
-    await Promise.all(tickers.map(async t=>{try{res[t]=await fetchYahoo(t);}catch{errs.push(t);}}));
-    setPrices(res);setLastUpdate(new Date());
-    if(errs.length)setError(`N/D: ${errs.join(", ")}`);
+    setLoading(true);setError(null);setCheckLog([]);
+    const tickers=[...new Set(holdings.map(h=>{
+      const b=BENCHMARK[h.categoria];
+      return b?.ticker?{ticker:b.ticker,stooq:b.stooq}:null;
+    }).filter(Boolean).map(JSON.stringify))].map(JSON.parse);
+    const res={},log=[];
+    await Promise.all(tickers.map(async ({ticker,stooq})=>{
+      const r=await fetchPriceVerified(ticker,stooq);
+      res[ticker]=r;
+      log.push(r);
+    }));
+    setPrices(res);setLastUpdate(new Date());setCheckLog(log);
+    const errs=log.filter(l=>l.error||l.warning);
+    if(errs.length)setError(`${errs.length} avvisi sui prezzi`);
     setLoading(false);
   },[holdings]);
   const enriched=holdings.map(h=>{
     const b=BENCHMARK[h.categoria];
-    if(!b?.ticker||!prices[b.ticker])return{...h,stimato:null,varPct:null};
+    if(!b?.ticker||!prices[b.ticker]||prices[b.ticker].error)return{...h,stimato:null,varPct:null};
     return{...h,stimato:h.controvaloreAttuale*(1+prices[b.ticker].varPct/100),varPct:prices[b.ticker].varPct};
   });
   const totalStimato=enriched.reduce((s,h)=>s+(h.stimato??h.controvaloreAttuale),0);
-  return{enriched,loading,lastUpdate,error,refresh,totalStimato};
+  return{enriched,loading,lastUpdate,error,refresh,totalStimato,checkLog};
 }
 
+// ─── VALIDAZIONE DATI LOCALI ─────────────────────────────────────────────────
+function validateHoldings(holdings){
+  const errors=[],warnings=[],info=[];
+  const required=["nome","controvaloreAttuale","categoria","banca","prezzoCarico","plusMinus"];
+
+  // Per ogni titolo non-liquido, controlla campi obbligatori
+  holdings.filter(h=>!isLiq(h)).forEach(h=>{
+    required.forEach(field=>{
+      if(h[field]==null||h[field]===undefined){
+        errors.push({titolo:h.nome,banca:h.banca,campo:field,problema:"campo mancante"});
+      }
+    });
+    // Almeno uno tra rendimentoAnnuo o rendimentoTotale deve essere presente
+    if(h.rendimentoAnnuo==null&&h.rendimentoTotale==null){
+      errors.push({titolo:h.nome,banca:h.banca,campo:"rendimento",problema:"manca sia rendimentoAnnuo che rendimentoTotale"});
+    }
+    // Sanity check valori
+    if(h.controvaloreAttuale!=null&&h.controvaloreAttuale<=0)
+      errors.push({titolo:h.nome,banca:h.banca,campo:"controvaloreAttuale",problema:`valore non valido (${h.controvaloreAttuale})`});
+    if(h.quantita!=null&&h.quantita<=0)
+      errors.push({titolo:h.nome,banca:h.banca,campo:"quantita",problema:`quantità non valida (${h.quantita})`});
+    if(h.prezzoCarico!=null&&h.prezzoCarico<=0)
+      errors.push({titolo:h.nome,banca:h.banca,campo:"prezzoCarico",problema:`prezzo non valido (${h.prezzoCarico})`});
+    // Cross-check plusMinus
+    if(h.prezzoCarico!=null&&h.quantita!=null&&h.controvaloreAttuale!=null&&h.plusMinus!=null){
+      const calcolato=h.controvaloreAttuale-(h.prezzoCarico*h.quantita);
+      const diff=Math.abs(calcolato-h.plusMinus);
+      const tol=Math.max(50,Math.abs(h.controvaloreAttuale)*0.005); // tolleranza 0.5% o 50€
+      if(diff>tol){
+        warnings.push({titolo:h.nome,banca:h.banca,campo:"plusMinus",problema:`incoerente: dichiarato ${fmtEur(h.plusMinus)}, calcolato ${fmtEur(calcolato)} (diff ${fmtEur(diff)})`});
+      }
+    }
+  });
+
+  // Coerenza totali
+  const total=holdings.reduce((s,h)=>s+(h.controvaloreAttuale||0),0);
+  const sumByBank=Object.keys(BANKS).map(b=>holdings.filter(h=>h.banca===b).reduce((s,h)=>s+(h.controvaloreAttuale||0),0)).reduce((a,b)=>a+b,0);
+  if(Math.abs(total-sumByBank)>1)
+    errors.push({campo:"totali",problema:`somma per banca (${fmtEur(sumByBank)}) non coincide con totale (${fmtEur(total)})`});
+
+  // Freschezza dati per banca
+  const today=new Date();
+  Object.entries(BANKS).forEach(([code,bank])=>{
+    const hasData=holdings.some(h=>h.banca===code);
+    if(!hasData)return;
+    const refDate=new Date(bank.dataRif);
+    const daysDiff=Math.floor((today-refDate)/(1000*60*60*24));
+    if(daysDiff>30)
+      warnings.push({banca:code,campo:"freschezza",problema:`dati ${bank.name} aggiornati ${daysDiff} giorni fa (${bank.dataRif})`});
+    info.push({banca:code,info:`Dati ${bank.name}: ${bank.dataRif} (${daysDiff} giorni fa)`});
+  });
+
+  // Conteggio totale
+  info.push({info:`Totale titoli: ${holdings.length} (${holdings.filter(h=>!isLiq(h)).length} non-liquidi)`});
+
+  return{errors,warnings,info,ok:errors.length===0};
+}
+
+// ─── PREFLIGHT CHECKS — verifica step-by-step prima di generare AI ─────────────
+// Restituisce un async generator che produce risultati di ogni step uno per uno
+// Ogni yield: {step, total, name, status: "running"|"ok"|"warning"|"error", details}
+// Se uno step ritorna "error", il chiamante deve fermare l'esecuzione
+async function* runPreflightChecks({holdings,bancaLabel,apiKey}){
+  const totalSteps=8;
+  let stepNum=0;
+
+  // ── STEP 1: Presenza titoli ───────────────────────────────────────────────
+  stepNum++;
+  yield{step:stepNum,total:totalSteps,name:"Presenza titoli",status:"running",details:[]};
+  await new Promise(r=>setTimeout(r,150));
+  const nonLiq=holdings.filter(h=>!isLiq(h));
+  if(nonLiq.length===0){
+    yield{step:stepNum,total:totalSteps,name:"Presenza titoli",status:"error",
+      details:[`Nessun titolo non-liquido trovato per "${bancaLabel}"`,"💡 Cambia il filtro banca o carica i dati"],blocking:true};
+    return;
+  }
+  yield{step:stepNum,total:totalSteps,name:"Presenza titoli",status:"ok",
+    details:[`${nonLiq.length} titoli non-liquidi trovati (${holdings.filter(isLiq).length} liquidità esclusa)`]};
+
+  // ── STEP 2: Completezza campi obbligatori ─────────────────────────────────
+  stepNum++;
+  yield{step:stepNum,total:totalSteps,name:"Completezza campi",status:"running",details:[]};
+  await new Promise(r=>setTimeout(r,200));
+  const required=["nome","banca","categoria","quantita","prezzoCarico","controvaloreAttuale","plusMinus","fonte"];
+  const incomplete=[];
+  nonLiq.forEach(h=>{
+    const missing=[];
+    required.forEach(f=>{if(h[f]==null||h[f]==="")missing.push(f);});
+    if(h.rendimentoAnnuo==null&&h.rendimentoTotale==null)missing.push("rendimento (annuo/totale)");
+    if(missing.length)incomplete.push({nome:h.nome,banca:h.banca,missing});
+  });
+  if(incomplete.length>0){
+    yield{step:stepNum,total:totalSteps,name:"Completezza campi",status:"error",
+      details:[`${incomplete.length} titoli con campi mancanti:`,
+        ...incomplete.slice(0,8).map(t=>`• ${t.nome.slice(0,40)} [${t.banca}]: manca ${t.missing.join(", ")}`),
+        incomplete.length>8?`... e altri ${incomplete.length-8}`:"",
+        "","💡 Aggiorna i dati dalla tab Impostazioni"].filter(Boolean),blocking:true};
+    return;
+  }
+  yield{step:stepNum,total:totalSteps,name:"Completezza campi",status:"ok",
+    details:[`Tutti i ${nonLiq.length} titoli hanno tutti i campi obbligatori`]};
+
+  // ── STEP 3: Coerenza numerica per ogni titolo ─────────────────────────────
+  stepNum++;
+  yield{step:stepNum,total:totalSteps,name:"Coerenza numerica",status:"running",details:[]};
+  await new Promise(r=>setTimeout(r,200));
+  const incoerenze=[];
+  nonLiq.forEach(h=>{
+    if(h.quantita<=0)incoerenze.push({nome:h.nome,problema:`quantità non valida (${h.quantita})`});
+    if(h.prezzoCarico<=0)incoerenze.push({nome:h.nome,problema:`PMC non valido (${h.prezzoCarico})`});
+    if(h.controvaloreAttuale<=0)incoerenze.push({nome:h.nome,problema:`controvalore non valido (${h.controvaloreAttuale})`});
+    // CTV ≈ Q × prezzoAttuale (se prezzoAttuale presente)
+    if(h.prezzoAttuale!=null){
+      const cvCalc=h.quantita*h.prezzoAttuale;
+      const diff=Math.abs(cvCalc-h.controvaloreAttuale);
+      const tol=Math.max(1,h.controvaloreAttuale*0.005);
+      if(diff>tol)incoerenze.push({nome:h.nome,problema:`CTV (${fmtEur(h.controvaloreAttuale)}) ≠ Q × Prezzo (${fmtEur(cvCalc)}), diff ${fmtEur(diff)}`});
+    }
+    // P&L ≈ CV - (Q × PMC)
+    const plCalc=h.controvaloreAttuale-(h.quantita*h.prezzoCarico);
+    const diff=Math.abs(plCalc-h.plusMinus);
+    const tol=Math.max(50,Math.abs(h.controvaloreAttuale)*0.005);
+    if(diff>tol)incoerenze.push({nome:h.nome,problema:`P&L (${fmtEur(h.plusMinus)}) ≠ CV - Q×PMC (${fmtEur(plCalc)}), diff ${fmtEur(diff)}`});
+  });
+  if(incoerenze.length>0){
+    yield{step:stepNum,total:totalSteps,name:"Coerenza numerica",status:"error",
+      details:[`${incoerenze.length} incoerenze numeriche:`,
+        ...incoerenze.slice(0,8).map(i=>`• ${i.nome.slice(0,40)}: ${i.problema}`),
+        incoerenze.length>8?`... e altri ${incoerenze.length-8}`:"",
+        "","💡 Controlla i dati dalla tab Impostazioni → Controllo dati"].filter(Boolean),blocking:true};
+    return;
+  }
+  yield{step:stepNum,total:totalSteps,name:"Coerenza numerica",status:"ok",
+    details:[`Tutti i titoli passano i controlli numerici (CTV = Q×Prezzo, P&L = CV - Q×PMC)`]};
+
+  // ── STEP 4: Coerenza totali per banca ────────────────────────────────────
+  stepNum++;
+  yield{step:stepNum,total:totalSteps,name:"Coerenza totali",status:"running",details:[]};
+  await new Promise(r=>setTimeout(r,150));
+  const totale=holdings.reduce((s,h)=>s+(h.controvaloreAttuale||0),0);
+  const sumByBank={};
+  const orfani=[];
+  holdings.forEach(h=>{
+    if(!BANKS[h.banca])orfani.push(h.nome);
+    else sumByBank[h.banca]=(sumByBank[h.banca]||0)+(h.controvaloreAttuale||0);
+  });
+  const sumAll=Object.values(sumByBank).reduce((a,b)=>a+b,0);
+  const errs4=[];
+  if(orfani.length>0)errs4.push(`Titoli con banca non riconosciuta: ${orfani.slice(0,3).join(", ")}`);
+  if(Math.abs(totale-sumAll)>1)errs4.push(`Somma per banca (${fmtEur(sumAll)}) ≠ totale (${fmtEur(totale)})`);
+  if(errs4.length>0){
+    yield{step:stepNum,total:totalSteps,name:"Coerenza totali",status:"error",
+      details:errs4,blocking:true};
+    return;
+  }
+  const dettagli4=Object.entries(sumByBank).map(([b,v])=>`• ${BANKS[b].name}: ${fmtEur(v)}`);
+  dettagli4.push(`Totale: ${fmtEur(totale)}`);
+  yield{step:stepNum,total:totalSteps,name:"Coerenza totali",status:"ok",details:dettagli4};
+
+  // ── STEP 5: Coerenza categorie ────────────────────────────────────────────
+  stepNum++;
+  yield{step:stepNum,total:totalSteps,name:"Coerenza categorie",status:"running",details:[]};
+  await new Promise(r=>setTimeout(r,150));
+  const catSconosciute=[];
+  const sumByCat={};
+  holdings.forEach(h=>{
+    if(!CAT_COLORS[h.categoria])catSconosciute.push({nome:h.nome,cat:h.categoria});
+    sumByCat[h.categoria]=(sumByCat[h.categoria]||0)+(h.controvaloreAttuale||0);
+  });
+  if(catSconosciute.length>0){
+    yield{step:stepNum,total:totalSteps,name:"Coerenza categorie",status:"error",
+      details:[`Categorie non riconosciute:`,
+        ...catSconosciute.slice(0,5).map(c=>`• ${c.nome.slice(0,40)}: "${c.cat}"`)],blocking:true};
+    return;
+  }
+  yield{step:stepNum,total:totalSteps,name:"Coerenza categorie",status:"ok",
+    details:[`${Object.keys(sumByCat).length} categorie tutte valide`]};
+
+  // ── STEP 6: Freschezza dati (warning) ─────────────────────────────────────
+  stepNum++;
+  yield{step:stepNum,total:totalSteps,name:"Freschezza dati",status:"running",details:[]};
+  await new Promise(r=>setTimeout(r,150));
+  const today=new Date();
+  const stale=[];
+  const dett6=[];
+  Object.entries(BANKS).forEach(([code,bank])=>{
+    const hasData=holdings.some(h=>h.banca===code);
+    if(!hasData)return;
+    const refDate=new Date(bank.dataRif);
+    const days=Math.floor((today-refDate)/(1000*60*60*24));
+    if(days>30)stale.push(`${bank.name}: ${days} giorni (${bank.dataRif})`);
+    dett6.push(`• ${bank.name}: ${bank.dataRif} (${days} giorni fa)`);
+  });
+  yield{step:stepNum,total:totalSteps,name:"Freschezza dati",
+    status:stale.length>0?"warning":"ok",details:stale.length>0?["⚠ Dati più vecchi di 30 giorni:",...stale.map(s=>`• ${s}`),"","Si procede comunque (warning)"]:dett6};
+
+  // ── STEP 7: API Key Gemini ────────────────────────────────────────────────
+  stepNum++;
+  yield{step:stepNum,total:totalSteps,name:"API Gemini",status:"running",details:["Test rapido con prompt 'OK'..."]};
+  if(!apiKey){
+    yield{step:stepNum,total:totalSteps,name:"API Gemini",status:"error",
+      details:["✗ API Key non inserita","","💡 Vai in Impostazioni e inserisci la key"],blocking:true};
+    return;
+  }
+  const test=await testGeminiKey();
+  if(!test.ok){
+    yield{step:stepNum,total:totalSteps,name:"API Gemini",status:"error",
+      details:[`✗ Test fallito: ${test.error}`,"","💡 Verifica la API Key in Impostazioni"],blocking:true};
+    return;
+  }
+  yield{step:stepNum,total:totalSteps,name:"API Gemini",status:"ok",
+    details:[`✓ Key valida — risposta: "${test.response}"`]};
+
+  // ── STEP 8: Tutto pronto ──────────────────────────────────────────────────
+  stepNum++;
+  yield{step:stepNum,total:totalSteps,name:"Pronto per generazione",status:"ok",
+    details:[`Tutti i controlli superati per ${nonLiq.length} titoli (${bancaLabel})`,"Generazione AI in corso..."]};
+}
+
+// Componente che mostra i preflight checks step-by-step
+function PreflightView({steps}){
+  return(<div style={{background:"#12121e",border:"0.5px solid #2a2a3e",borderRadius:8,padding:"12px 14px",marginTop:12}}>
+    <div style={{fontSize:12,fontWeight:700,color:"#1D9E75",marginBottom:10}}>🛡 Verifica pre-generazione</div>
+    {steps.map((s,i)=>{
+      const cfg={
+        running:{color:"#7F77DD",icon:"⏳"},
+        ok:{color:"#1D9E75",icon:"✓"},
+        warning:{color:"#EF9F27",icon:"⚠"},
+        error:{color:"#D85A30",icon:"✗"},
+      }[s.status];
+      return(<div key={i} style={{marginBottom:8,padding:"8px 10px",borderRadius:6,background:"#1e2235",borderLeft:`2px solid ${cfg.color}`}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,fontWeight:600,color:cfg.color}}>
+          <span>{cfg.icon}</span>
+          <span>Step {s.step}/{s.total} — {s.name}</span>
+        </div>
+        {s.details?.length>0&&<div style={{marginTop:4,paddingLeft:20,fontSize:11,color:"#aaa",lineHeight:1.6}}>
+          {s.details.map((d,j)=><div key={j}>{d}</div>)}
+        </div>}
+      </div>);
+    })}
+  </div>);
+}
+
+// Validazione risposta Gemini per Previsioni
+function validatePrevisioniJSON(json,holdings){
+  const errors=[],warnings=[];
+  if(!json.contesto||!json.base||!json.ottimistico||!json.pessimistico||!json.raccomandazioni)
+    errors.push("Struttura JSON incompleta");
+  ["base","ottimistico","pessimistico"].forEach(k=>{
+    if(!json[k])return;
+    if(typeof json[k].rendimento!=="number")errors.push(`Rendimento ${k} non numerico`);
+    if(json[k].rendimento>50||json[k].rendimento<-50)
+      warnings.push(`Rendimento ${k} (${json[k].rendimento}%) molto fuori scala`);
+  });
+  if(json.ottimistico&&json.base&&json.pessimistico){
+    if(!(json.pessimistico.rendimento<=json.base.rendimento&&json.base.rendimento<=json.ottimistico.rendimento))
+      errors.push("Scenari non ordinati: pessimistico ≤ base ≤ ottimistico");
+  }
+  if(json.contesto&&!looksItalian(json.contesto))warnings.push("Risposta forse non in italiano");
+  return{errors,warnings,ok:errors.length===0};
+}
+
+// Validazione risposta Gemini per Azioni
+function validateAzioniJSON(json,holdings){
+  const errors=[],warnings=[];
+  if(!json.titoli||!Array.isArray(json.titoli))errors.push("Campo 'titoli' mancante o non array");
+  if(json.titoli){
+    const nomi=holdings.map(h=>h.nome.toLowerCase());
+    json.titoli.forEach(t=>{
+      if(!t.nome||!t.azione||!t.priorita)
+        errors.push(`Titolo con campi mancanti: ${JSON.stringify(t).slice(0,80)}`);
+      if(t.azione&&!["vendi","monitora","mantieni","incrementa","switch"].includes(t.azione))
+        errors.push(`Azione non valida: "${t.azione}" per ${t.nome}`);
+      if(t.priorita&&!["alta","media","bassa"].includes(t.priorita))
+        errors.push(`Priorità non valida: "${t.priorita}" per ${t.nome}`);
+      // Verifica esistenza titolo
+      const found=nomi.some(n=>n===t.nome?.toLowerCase()||n.startsWith(t.nome?.toLowerCase().slice(0,20)));
+      if(!found)warnings.push(`Titolo non riconosciuto nel portafoglio: "${t.nome}"`);
+    });
+  }
+  if(json.sommario&&!looksItalian(json.sommario))warnings.push("Risposta forse non in italiano");
+  return{errors,warnings,ok:errors.length===0};
+}
+
+// ─── RESPONSIVE HELPERS ──────────────────────────────────────────────────────
+const useIsMobile=()=>{
+  const[m,setM]=useState(window.innerWidth<640);
+  useEffect(()=>{const h=()=>setM(window.innerWidth<640);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
+  return m;
+};
+
+const Section=({title,children,style})=>(
+  <div style={{background:"#1e2235",borderRadius:12,padding:"16px",marginBottom:12,...style}}>
+    {title&&<div style={{fontWeight:600,fontSize:14,marginBottom:12,color:"white"}}>{title}</div>}
+    {children}
+  </div>
+);
+
+// ─── PIE CHART ───────────────────────────────────────────────────────────────
 function PieChart({data,size=110}){
   const total=data.reduce((s,d)=>s+d.value,0);
   if(!total)return null;
@@ -169,67 +597,327 @@ function PieChart({data,size=110}){
   </svg>);
 }
 
-// ─── RESPONSIVE HELPERS ──────────────────────────────────────────────────────
-const useIsMobile=()=>{
-  const[m,setM]=useState(window.innerWidth<640);
-  useEffect(()=>{const h=()=>setM(window.innerWidth<640);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-  return m;
-};
+// ─── DIALOG CONFIRM ──────────────────────────────────────────────────────────
+function ConfirmDialog({open,title,message,onConfirm,onCancel,danger}){
+  if(!open)return null;
+  return(<div style={{position:"fixed",inset:0,background:"#000000cc",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onCancel}>
+    <div onClick={e=>e.stopPropagation()} style={{background:"#1e2235",borderRadius:14,maxWidth:420,width:"100%",padding:24,border:`1px solid ${danger?"#D85A30":"#444"}`}}>
+      <div style={{fontSize:16,fontWeight:600,marginBottom:8,color:danger?"#D85A30":"white"}}>{title}</div>
+      <div style={{fontSize:13,color:"#ccc",marginBottom:20,lineHeight:1.6}}>{message}</div>
+      <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+        <button onClick={onCancel} style={{padding:"9px 16px",borderRadius:8,border:"0.5px solid #444",background:"transparent",color:"#aaa",cursor:"pointer",fontSize:13}}>Annulla</button>
+        <button onClick={onConfirm} style={{padding:"9px 16px",borderRadius:8,border:"none",background:danger?"#D85A30":"#1D9E75",color:"white",cursor:"pointer",fontSize:13,fontWeight:500}}>Conferma</button>
+      </div>
+    </div>
+  </div>);
+}
 
-const KPICard=({label,value,sub,color,alert})=>(
-  <div style={{background:alert?"#EF9F2710":"#1e2235",border:alert?"0.5px solid #EF9F2740":"none",borderRadius:12,padding:"14px 16px",flex:1}}>
-    <div style={{fontSize:11,color:"#888",marginBottom:4}}>{label}</div>
-    <div style={{fontSize:20,fontWeight:600,color:color||(alert?"#EF9F27":"white"),lineHeight:1.2}}>{value}</div>
-    {sub&&<div style={{fontSize:11,color:"#888",marginTop:4}}>{sub}</div>}
-  </div>
-);
+// ─── DISCLAIMER PERMANENTE ───────────────────────────────────────────────────
+function Disclaimer(){
+  return(<div style={{background:"#EF9F2710",border:"0.5px solid #EF9F2740",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:11,color:"#EF9F27",lineHeight:1.5}}>
+    ⚠ Le analisi AI hanno scopo puramente informativo e non costituiscono consulenza finanziaria. Per decisioni di investimento, consulta sempre il tuo consulente.
+  </div>);
+}
 
-const Section=({title,children,style})=>(
-  <div style={{background:"#1e2235",borderRadius:12,padding:"16px",marginBottom:12,...style}}>
-    {title&&<div style={{fontWeight:600,fontSize:14,marginBottom:12,color:"white"}}>{title}</div>}
-    {children}
-  </div>
-);
+// ─── BADGE AFFIDABILITÀ ──────────────────────────────────────────────────────
+function ReliabilityBadge({level}){
+  const cfg={
+    green:{color:"#1D9E75",bg:"#1D9E7515",label:"Affidabile",icon:"🟢"},
+    yellow:{color:"#EF9F27",bg:"#EF9F2715",label:"Parziale",icon:"🟡"},
+    red:{color:"#D85A30",bg:"#D85A3015",label:"Inaffidabile",icon:"🔴"},
+  }[level]||{};
+  return(<span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"3px 10px",borderRadius:12,background:cfg.bg,color:cfg.color,fontSize:11,fontWeight:600,border:`0.5px solid ${cfg.color}40`}}>
+    {cfg.icon} {cfg.label}
+  </span>);
+}
+
+// ─── CONTROLLI ESEGUITI (sezione in cima ai report) ──────────────────────────
+function ControlliBox({controlli}){
+  return(<div style={{background:"#1D9E7510",border:"0.5px solid #1D9E7540",borderRadius:8,padding:"10px 12px",marginBottom:14,fontSize:11,color:"#1D9E75",lineHeight:1.7}}>
+    <div style={{fontWeight:700,marginBottom:6,color:"#1D9E75"}}>✓ Controlli eseguiti</div>
+    {controlli.map((c,i)=><div key={i} style={{color:"#aaffcc"}}>• {c}</div>)}
+  </div>);
+}
+
+// ─── MANUALE ─────────────────────────────────────────────────────────────────
+function Manuale({onClose}){
+  const sections=[
+    {title:"1. Come avviare l'app",content:[
+      {type:"body",text:"L'app è contenuta in un singolo file <b>index.html</b>. Per usarla:"},
+      {type:"steps",items:["Apri <b>Visual Studio Code</b>","Installa l'estensione <b>Live Server</b> (se non già installata)","Apri la cartella contenente <b>index.html</b>","Tasto destro su index.html → <b>Open with Live Server</b>","Il browser si apre su <b>http://localhost:5500</b>"]},
+      {type:"warning",text:"⚠ Non aprire il file con doppio click — alcune funzionalità AI e prezzi live richiedono Live Server per funzionare correttamente."},
+    ]},
+    {title:"2. Filosofia: affidabilità prima di tutto",content:[
+      {type:"body",text:"Questa app è progettata per <b>dare informazioni corrette o nessuna informazione</b>. Non genera mai analisi se i dati sono incompleti o sospetti. Ogni report mostra in cima i controlli eseguiti, e ogni numero ha la sua fonte esplicita."},
+      {type:"tip",text:"💡 Prima di usare le funzioni AI, premi 'Controllo dati' nelle Impostazioni per verificare che tutto sia in ordine."},
+    ]},
+    {title:"3. Controllo dati (Impostazioni)",content:[
+      {type:"body",text:"Il pulsante <b>'Controllo dati'</b> verifica:"},
+      {type:"bullets",items:[
+        "<b>Integrità dati locali</b> — ogni titolo ha tutti i campi (nome, controvalore, prezzoCarico, plusMinus, rendimento)",
+        "<b>Coerenza numerica</b> — plusMinus = controvalore - (quantità × PMC) per ogni titolo",
+        "<b>Coerenza totali</b> — somma per banca = totale generale",
+        "<b>Freschezza dati</b> — warning se i dati banca sono più vecchi di 30 giorni",
+        "<b>Test connessione prezzi</b> — verifica Yahoo Finance e Stooq con doppio check (tolleranza 1%)",
+        "<b>Test API Gemini</b> — verifica che la key sia valida",
+      ]},
+      {type:"body",text:"Se vengono trovati problemi, appare un badge rosso sulla tab Impostazioni."},
+    ]},
+    {title:"4. Validazione pre-generazione AI",content:[
+      {type:"body",text:"Prima di generare Analisi, Previsioni o Azioni, l'app verifica automaticamente:"},
+      {type:"bullets",items:[
+        "Tutti i titoli da analizzare hanno dati completi (altrimenti <b>blocca</b> con lista titoli mancanti)",
+        "I prezzi live sono concordanti tra Yahoo e Stooq",
+        "La risposta dell'AI ha struttura corretta e numeri plausibili",
+        "Gli scenari di previsione sono ordinati (pessimistico ≤ base ≤ ottimistico)",
+        "I titoli citati dall'AI esistono nel portafoglio",
+      ]},
+      {type:"warning",text:"⚠ Se anche un solo controllo fallisce, l'app non genera il report e mostra un messaggio di errore con il dettaglio."},
+    ]},
+    {title:"5. Filtro banca e liquidità",content:[
+      {type:"body",text:"In cima a Analisi/Previsioni/Azioni puoi selezionare quale banca analizzare: <b>Tutto, Mediolanum, BPER Banca, Poste Italiane</b>."},
+      {type:"body",text:"La liquidità (C/C, libretti) viene <b>sempre esclusa</b> dalle analisi AI ma mostrata in un box separato."},
+    ]},
+    {title:"6. Tipologie di rendimento",content:[
+      {type:"body",text:"L'app distingue due tipi di rendimento, perché le banche li forniscono in modo diverso:"},
+      {type:"bullets",items:[
+        "<b>Rend. annuo</b> (Mediolanum, Poste polizze) — rendimento <b>annualizzato</b>: percentuale di guadagno per anno di possesso.",
+        "<b>Rend. totale</b> (BPER) — rendimento <b>totale dall'acquisto</b>: percentuale di guadagno complessivo, NON annualizzato. Il rendiconto BPER non riporta la data di acquisto, quindi non è possibile annualizzarlo.",
+      ]},
+      {type:"body",text:"Nelle tab Titoli e Dashboard è indicato esplicitamente con la sigla <b>'ann'</b> (annuo) o <b>'tot'</b> (totale). Nei prompt AI viene specificata la differenza per evitare confronti errati."},
+    ]},
+    {title:"7. Prezzi live",content:[
+      {type:"body",text:"In Impostazioni, il pulsante <b>'Carica prezzi live'</b> stima il valore attuale del portafoglio combinando i prezzi degli ETF benchmark da <b>Yahoo Finance e Stooq.com</b>."},
+      {type:"body",text:"Se i due prezzi differiscono di più dell'1%, viene mostrato un warning."},
+      {type:"warning",text:"⚠ La stima è indicativa — non riflette il NAV reale dei tuoi fondi."},
+    ]},
+    {title:"8. Storico e affidabilità report",content:[
+      {type:"body",text:"Ogni analisi/previsione/azione viene salvata (max 5 per tab). Ogni voce mostra:"},
+      {type:"bullets",items:[
+        "<b>Data e banca</b> analizzata",
+        "<b>Badge affidabilità</b> 🟢 (verde) / 🟡 (giallo) / 🔴 (rosso)",
+        "<b>Hash dati</b> — se i dati attuali sono diversi da quando fu generato il report, appare un avviso",
+      ]},
+      {type:"body",text:"Pulsante <b>PDF</b> per esportare. Il PDF include il nome banca, i controlli eseguiti, e il disclaimer."},
+    ]},
+    {title:"9. Backup e ripristino",content:[
+      {type:"body",text:"In Impostazioni puoi:"},
+      {type:"bullets",items:[
+        "<b>Esporta backup JSON</b> — scarica un file con tutti i dati del portafoglio",
+        "<b>Importa backup</b> — ripristina i dati da un file JSON precedente",
+        "<b>Carica CSV banca</b> — aggiorna i dati di una specifica banca (con conferma prima di sovrascrivere)",
+      ]},
+    ]},
+    {title:"10. Note importanti",content:[
+      {type:"warning",text:"💾 Lo storico è salvato nel browser locale. Non è accessibile da altri dispositivi. Se cancelli la cache, lo storico viene perso — usa Backup JSON per non perdere dati."},
+      {type:"warning",text:"🔑 La API key Gemini va reinserita ad ogni apertura del browser per motivi di sicurezza."},
+      {type:"tip",text:"🤖 Anche con tutti i controlli, le analisi AI sono indicative. Per decisioni di investimento, consulta sempre il tuo consulente finanziario."},
+    ]},
+  ];
+
+  const renderContent=items=>items.map((item,i)=>{
+    if(item.type==="body")return <p key={i} style={{fontSize:13,lineHeight:1.7,color:"#ccc",marginBottom:10}} dangerouslySetInnerHTML={{__html:item.text}}/>;
+    if(item.type==="steps")return <ol key={i} style={{paddingLeft:20,marginBottom:10}}>{item.items.map((s,j)=><li key={j} style={{fontSize:13,color:"#ccc",lineHeight:1.7,marginBottom:4}} dangerouslySetInnerHTML={{__html:s}}/>)}</ol>;
+    if(item.type==="bullets")return <ul key={i} style={{paddingLeft:20,marginBottom:10,listStyle:"disc"}}>{item.items.map((s,j)=><li key={j} style={{fontSize:13,color:"#ccc",lineHeight:1.7,marginBottom:4}} dangerouslySetInnerHTML={{__html:s}}/>)}</ul>;
+    if(item.type==="warning")return <div key={i} style={{background:"#EF9F2710",border:"0.5px solid #EF9F2740",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:12,color:"#EF9F27",lineHeight:1.6}}>{item.text}</div>;
+    if(item.type==="tip")return <div key={i} style={{background:"#1D9E7510",border:"0.5px solid #1D9E7540",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:12,color:"#1D9E75",lineHeight:1.6}}>{item.text}</div>;
+    return null;
+  });
+
+  return(<div style={{position:"fixed",inset:0,background:"#000000cc",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+    <div onClick={e=>e.stopPropagation()} style={{background:"#1a1a2e",borderRadius:"20px 20px 0 0",width:"100%",maxWidth:680,maxHeight:"92vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px 14px",borderBottom:"0.5px solid #2a2a3e",flexShrink:0}}>
+        <div>
+          <div style={{fontSize:18,fontWeight:700}}>Manuale d'uso</div>
+          <div style={{fontSize:12,color:"#888",marginTop:2}}>Portfolio Analyzer v{APP_VERSION}</div>
+        </div>
+        <button onClick={onClose} style={{width:32,height:32,borderRadius:"50%",border:"none",background:"#2a2a3e",color:"#888",cursor:"pointer",fontSize:18}}>✕</button>
+      </div>
+      <div style={{overflowY:"auto",padding:"16px 20px 32px",flex:1}}>
+        {sections.map((s,i)=>(
+          <div key={i} style={{marginBottom:24}}>
+            <div style={{fontSize:15,fontWeight:700,color:"#1D9E75",marginBottom:12,paddingBottom:8,borderBottom:"0.5px solid #2a2a3e"}}>{s.title}</div>
+            {renderContent(s.content)}
+          </div>
+        ))}
+        <div style={{fontSize:11,color:"#555",textAlign:"center",paddingTop:8}}>Portfolio Analyzer v{APP_VERSION} · Sviluppato con Claude (Anthropic)</div>
+      </div>
+    </div>
+  </div>);
+}
 
 // ─── IMPOSTAZIONI ────────────────────────────────────────────────────────────
-function ImpostazioniTab({bankData,setBankData,apiKey,setApiKey,showKey,setShowKey,byBank,totalValue,live}){
-  const isMobile=useIsMobile();
-  const parse=text=>{
+function ImpostazioniTab({bankData,setBankData,apiKey,setApiKey,showKey,setShowKey,byBank,totalValue,live,validation,onProblems}){
+  const[checkRunning,setCheckRunning]=useState(false);
+  const[checkReport,setCheckReport]=useState(null);
+  const[confirm,setConfirm]=useState(null);
+  const[csvPending,setCsvPending]=useState(null);
+
+  // Notifica problemi al parent (per badge rosso)
+  useEffect(()=>{
+    if(checkReport){
+      const hasProblems=checkReport.sections.some(s=>s.level==="red");
+      onProblems&&onProblems(hasProblems);
+    }
+  },[checkReport,onProblems]);
+
+  const runCheck=async()=>{
+    setCheckRunning(true);
+    const sections=[];
+    const all=Object.values(bankData).flat();
+
+    // 1. Integrità dati locali
+    const v=validateHoldings(all);
+    sections.push({
+      title:"Integrità dati locali",
+      level:v.errors.length>0?"red":(v.warnings.length>0?"yellow":"green"),
+      details:[
+        ...v.info.map(i=>`✓ ${i.info||i.banca}`),
+        ...v.warnings.map(w=>`⚠ ${w.titolo||w.banca||""}: ${w.problema}`),
+        ...v.errors.map(e=>`✗ ${e.titolo||e.banca||""}: ${e.problema}`),
+      ],
+    });
+
+    // 2. Test prezzi live (Yahoo + Stooq)
+    const tickerTest=[{ticker:"SPY",stooq:"spy.us"},{ticker:"AGG",stooq:"agg.us"}];
+    const priceResults=[];
+    for(const t of tickerTest){
+      try{const r=await fetchPriceVerified(t.ticker,t.stooq);priceResults.push(r);}
+      catch(e){priceResults.push({ticker:t.ticker,error:e.message});}
+    }
+    const allOk=priceResults.every(p=>p.ok&&!p.warning);
+    const someOk=priceResults.some(p=>p.ok);
+    sections.push({
+      title:"Connessione prezzi (Yahoo + Stooq)",
+      level:allOk?"green":(someOk?"yellow":"red"),
+      details:priceResults.map(p=>{
+        if(p.error)return `✗ ${p.ticker}: ${p.error}`;
+        if(p.warning)return `⚠ ${p.ticker}: ${p.warning}`;
+        return `✓ ${p.ticker}: ${p.checkInfo}`;
+      }),
+    });
+
+    // 3. Test API Gemini
+    if(apiKey){
+      const g=await testGeminiKey();
+      sections.push({
+        title:"API Gemini",
+        level:g.ok?"green":"red",
+        details:[g.ok?`✓ Key valida — risposta: "${g.response}"`:`✗ ${g.error}`],
+      });
+    }else{
+      sections.push({
+        title:"API Gemini",
+        level:"yellow",
+        details:["⚠ API Key non inserita — Analisi/Previsioni/Azioni non funzioneranno"],
+      });
+    }
+
+    setCheckReport({timestamp:new Date(),sections});
+    setCheckRunning(false);
+  };
+
+  const exportBackup=()=>{
+    const backup={version:APP_VERSION,timestamp:new Date().toISOString(),data:bankData};
+    const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=`portfolio_backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+  };
+
+  const importBackup=f=>{
+    const r=new FileReader();
+    r.onload=e=>{
+      try{
+        const b=JSON.parse(e.target.result);
+        if(!b.data||typeof b.data!=="object")throw new Error("Formato non valido");
+        setConfirm({
+          title:"Importa backup",
+          message:`Sostituire i dati attuali con quelli del backup del ${b.timestamp?.slice(0,10)}? Questa azione non può essere annullata.`,
+          danger:true,
+          onConfirm:()=>{setBankData(b.data);setConfirm(null);},
+        });
+      }catch{alert("File backup non valido");}
+    };
+    r.readAsText(f,"UTF-8");
+  };
+
+  const parseCSV=text=>{
     const lines=text.trim().split("\n");
     const header=lines[0].split(";").map(h=>h.trim().replace(/^\uFEFF/,""));
     return lines.slice(1).map(line=>{
       const vals=line.split(";");const o={};
       header.forEach((h,i)=>{o[h]=vals[i]?.trim()||"";});
       const n=s=>s?parseFloat(s.replace(/\./g,"").replace(",","."))||null:null;
-      return{nome:o.Nome||o.nome||"",isin:o.ISIN||o.isin||null,quantita:n(o["Quantità"]||o.quantita),prezzoCarico:n(o.Prezzo_Carico||o.prezzo_carico),controvaloreAttuale:n(o.Prezzo_Attuale||o.prezzo_attuale),categoria:o.Categoria||o.categoria||"Altro",banca:null,plusMinus:null,rendimentoAnnuo:null};
+      return{nome:o.Nome||o.nome||"",isin:o.ISIN||o.isin||null,quantita:n(o["Quantità"]||o.quantita),prezzoCarico:n(o.Prezzo_Carico||o.prezzo_carico),controvaloreAttuale:n(o.Prezzo_Attuale||o.prezzo_attuale)||n(o.Controvalore||o.controvalore),categoria:o.Categoria||o.categoria||"Altro",banca:null,plusMinus:n(o.PlusMinus||o.plusMinus),rendimentoAnnuo:n(o.Rendimento_Annuo||o.rendimentoAnnuo||o.Rendimento||o.rendimento),rendimentoTotale:n(o.Rendimento_Totale||o.rendimentoTotale),fonte:`Import CSV ${new Date().toLocaleDateString("it-IT")}`};
     }).filter(r=>r.nome);
   };
+
+  const handleCSV=(code,f)=>{
+    const r=new FileReader();
+    r.onload=e=>{
+      try{
+        const data=parseCSV(e.target.result).map(h=>({...h,banca:code}));
+        setCsvPending({code,data});
+        setConfirm({
+          title:`Sovrascrivere dati ${BANKS[code].name}?`,
+          message:`Stai per sostituire ${(bankData[code]||[]).length} titoli esistenti con ${data.length} nuovi titoli. L'azione non può essere annullata. Vuoi continuare?`,
+          danger:true,
+          onConfirm:()=>{setBankData(prev=>({...prev,[code]:data}));setCsvPending(null);setConfirm(null);},
+        });
+      }catch{alert("Errore CSV");}
+    };
+    r.readAsText(f,"UTF-8");
+  };
+
+  const v=validation;
+  const hasLocalProblems=v&&(v.errors.length>0||v.warnings.length>0);
+
   return(<div>
     {/* API Key */}
     <Section title="API Key Google (Gemini)">
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         <div style={{display:"flex",gap:8}}>
           <input type={showKey?"text":"password"} value={apiKey} onChange={e=>{setApiKey(e.target.value);window._aiKey=e.target.value;}} placeholder="AIzaSy…" style={{flex:1,padding:"10px 12px",borderRadius:8,border:"0.5px solid #444",background:"#12121e",color:"white",fontSize:13,fontFamily:"monospace"}}/>
-          <button onClick={()=>setShowKey(s=>!s)} style={{padding:"10px 14px",borderRadius:8,border:"0.5px solid #444",background:"#2a2a3e",color:"#aaa",cursor:"pointer",fontSize:13,whiteSpace:"nowrap"}}>{showKey?"Nascondi":"Mostra"}</button>
+          <button onClick={()=>setShowKey(s=>!s)} style={{padding:"10px 14px",borderRadius:8,border:"0.5px solid #444",background:"#2a2a3e",color:"#aaa",cursor:"pointer",fontSize:13}}>{showKey?"Nascondi":"Mostra"}</button>
         </div>
-        {apiKey
-          ?<div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#1D9E75"}}>✓ Key impostata — Analisi AI attiva</div>
-          :<div style={{fontSize:12,color:"#888",fontStyle:"italic"}}>Necessaria per Analisi, Previsioni e Azioni</div>
-        }
+        {apiKey?<div style={{fontSize:12,color:"#1D9E75"}}>✓ Key impostata</div>:<div style={{fontSize:12,color:"#888",fontStyle:"italic"}}>Necessaria per Analisi, Previsioni e Azioni</div>}
       </div>
     </Section>
 
-    {/* Totali per banca */}
+    {/* Controllo dati */}
+    <Section title="Controllo dati e affidabilità">
+      <div style={{fontSize:12,color:"#aaa",marginBottom:12,lineHeight:1.6}}>
+        Verifica integrità dati, coerenza numerica, freschezza, connessione prezzi e API. Esegui prima di generare report AI.
+      </div>
+      <button onClick={runCheck} disabled={checkRunning} style={{width:"100%",padding:"12px",borderRadius:10,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:checkRunning?"not-allowed":"pointer",fontSize:14,fontWeight:500,marginBottom:checkReport?12:0}}>
+        {checkRunning?"Controllo in corso…":"🛡 Esegui controllo dati"}
+      </button>
+      {checkReport&&(<div>
+        <div style={{fontSize:11,color:"#888",marginBottom:10,fontStyle:"italic"}}>Ultimo controllo: {checkReport.timestamp.toLocaleString("it-IT")}</div>
+        {checkReport.sections.map((s,i)=>{
+          const cfg={green:{color:"#1D9E75",icon:"🟢"},yellow:{color:"#EF9F27",icon:"🟡"},red:{color:"#D85A30",icon:"🔴"}}[s.level];
+          return(<div key={i} style={{marginBottom:10,padding:"10px 12px",borderRadius:8,background:"#12121e",borderLeft:`3px solid ${cfg.color}`}}>
+            <div style={{fontSize:13,fontWeight:600,color:cfg.color,marginBottom:6}}>{cfg.icon} {s.title}</div>
+            {s.details.map((d,j)=><div key={j} style={{fontSize:11,color:"#aaa",lineHeight:1.6,marginLeft:4}}>{d}</div>)}
+          </div>);
+        })}
+      </div>)}
+    </Section>
+
+    {/* Per banca */}
     <Section title="Portafoglio per banca">
       {byBank.map(b=>(
         <div key={b.code} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:"0.5px solid #2a2a3e"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:10,height:10,borderRadius:"50%",background:b.color}}/>
             <span style={{fontSize:14,fontWeight:500}}>{b.name}</span>
+            <span style={{fontSize:10,color:"#666"}}>{BANKS[b.code]?.dataRif}</span>
           </div>
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:16,fontWeight:600,color:b.color}}>{fmtEur(b.value)}</div>
-            <div style={{fontSize:11,color:"#888"}}>{totalValue>0?Math.round(b.value/totalValue*100):0}% del totale</div>
+            <div style={{fontSize:11,color:"#888"}}>{totalValue>0?Math.round(b.value/totalValue*100):0}%</div>
           </div>
         </div>
       ))}
@@ -240,7 +928,7 @@ function ImpostazioniTab({bankData,setBankData,apiKey,setApiKey,showKey,setShowK
     </Section>
 
     {/* Prezzi live */}
-    <Section title="Prezzi live">
+    <Section title="Prezzi live (doppio check Yahoo + Stooq)">
       <div style={{fontSize:12,color:"#888",marginBottom:12}}>Stima basata su benchmark ETF dal {DATA_RIF}</div>
       {live.lastUpdate&&(
         <div style={{marginBottom:12}}>
@@ -255,47 +943,57 @@ function ImpostazioniTab({bankData,setBankData,apiKey,setApiKey,showKey,setShowK
       <button onClick={live.refresh} disabled={live.loading} style={{width:"100%",padding:"12px",borderRadius:10,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:live.loading?"not-allowed":"pointer",fontSize:14,fontWeight:500}}>
         {live.loading?"Aggiornamento…":live.lastUpdate?`↻ Aggiorna (${live.lastUpdate.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"})})`:"Carica prezzi live"}
       </button>
+      {live.checkLog?.length>0&&(<div style={{marginTop:12,fontSize:11,color:"#aaa"}}>
+        <div style={{fontWeight:600,marginBottom:4}}>Log verifica:</div>
+        {live.checkLog.map((c,i)=>{
+          const ico=c.error?"✗":(c.warning?"⚠":"✓");
+          const col=c.error?"#D85A30":(c.warning?"#EF9F27":"#1D9E75");
+          return(<div key={i} style={{color:col,lineHeight:1.5}}>{ico} {c.ticker}: {c.checkInfo||c.warning||c.error}</div>);
+        })}
+      </div>)}
     </Section>
 
-    {/* Upload CSV */}
-    <Section title="Aggiorna dati">
-      <div style={{fontSize:12,color:"#888",marginBottom:12}}>Carica un nuovo CSV per aggiornare i dati di una banca</div>
+    {/* Backup / Import */}
+    <Section title="Backup dati">
+      <div style={{fontSize:12,color:"#aaa",marginBottom:12,lineHeight:1.6}}>Salva una copia dei tuoi dati o ripristinala in caso di problemi.</div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        <button onClick={exportBackup} style={{flex:"1 1 140px",padding:"10px",borderRadius:8,border:"0.5px solid #1D9E7540",background:"#1D9E7515",color:"#1D9E75",cursor:"pointer",fontSize:13,fontWeight:500}}>📥 Esporta JSON</button>
+        <label style={{flex:"1 1 140px",padding:"10px",borderRadius:8,border:"0.5px solid #7F77DD40",background:"#7F77DD15",color:"#7F77DD",cursor:"pointer",fontSize:13,fontWeight:500,textAlign:"center"}}>
+          📤 Importa JSON
+          <input type="file" accept=".json" style={{display:"none"}} onChange={e=>importBackup(e.target.files[0])}/>
+        </label>
+      </div>
+    </Section>
+
+    {/* Aggiorna CSV banca */}
+    <Section title="Aggiorna dati banca da CSV">
+      <div style={{fontSize:12,color:"#aaa",marginBottom:12,lineHeight:1.6}}>Carica un nuovo CSV per sostituire i dati di una banca (con conferma).</div>
       {Object.entries(BANKS).map(([code,bank])=>{
         const ref=React.createRef();
-        const handleFile=f=>{
-          const r=new FileReader();
-          r.onload=e=>{
-            try{
-              const data=parse(e.target.result).map(h=>({...h,banca:code}));
-              setBankData(prev=>({...prev,[code]:data}));
-            }catch{alert("Errore CSV");}
-          };
-          r.readAsText(f,"UTF-8");
-        };
         return(<div key={code} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:"0.5px solid #2a2a3e"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:8,height:8,borderRadius:"50%",background:bank.color}}/>
             <span style={{fontSize:14}}>{bank.name}</span>
-            <span style={{fontSize:11,color:"#1D9E75"}}>{bankData[code]?.length?"✓ "+bankData[code].length+" titoli":""}</span>
+            <span style={{fontSize:11,color:"#1D9E75"}}>{(bankData[code]||[]).length>0?"✓ "+(bankData[code]||[]).length+" titoli":""}</span>
           </div>
           <button onClick={()=>ref.current?.click()} style={{padding:"8px 14px",borderRadius:8,border:`0.5px solid ${bank.color}60`,background:`${bank.color}15`,color:bank.color,cursor:"pointer",fontSize:12,fontWeight:500}}>
             Carica CSV
-            <input ref={ref} type="file" accept=".csv" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+            <input ref={ref} type="file" accept=".csv" style={{display:"none"}} onChange={e=>handleCSV(code,e.target.files[0])}/>
           </button>
         </div>);
       })}
     </Section>
 
-    <div style={{fontSize:11,color:"#555",textAlign:"center",padding:"8px 0 24px"}}>Portfolio Analyzer v2.0 · Dati aggiornati al {DATA_RIF}</div>
+    <div style={{fontSize:11,color:"#555",textAlign:"center",padding:"8px 0 24px"}}>Portfolio Analyzer v{APP_VERSION} · Profilo bilanciato</div>
+
+    <ConfirmDialog open={!!confirm} {...(confirm||{})} onCancel={()=>setConfirm(null)}/>
   </div>);
 }
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 function DashboardTab({all,totalValue,totalPL,totalPLpct,byBank,catData,live}){
-  const isMobile=useIsMobile();
   const{lastUpdate,totalStimato}=live;
   return(<div>
-    {/* Hero KPI */}
     <div style={{background:"linear-gradient(135deg,#1a2a3a,#1e2235)",borderRadius:16,padding:"20px",marginBottom:12}}>
       <div style={{fontSize:12,color:"#888",marginBottom:4}}>Valore portafoglio {lastUpdate?"(stima)":""}</div>
       <div style={{fontSize:32,fontWeight:700,letterSpacing:"-0.5px"}}>{fmtEur(lastUpdate?totalStimato:totalValue)}</div>
@@ -316,7 +1014,6 @@ function DashboardTab({all,totalValue,totalPL,totalPLpct,byBank,catData,live}){
       </div>
     </div>
 
-    {/* Banche */}
     <Section title="Per banca">
       {byBank.map(b=>(
         <div key={b.code} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"0.5px solid #2a2a3e"}}>
@@ -332,7 +1029,6 @@ function DashboardTab({all,totalValue,totalPL,totalPLpct,byBank,catData,live}){
       ))}
     </Section>
 
-    {/* Asset allocation */}
     <Section title="Asset allocation">
       <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:12}}>
         <PieChart data={catData.map(c=>({value:c.value,color:c.color,label:c.label}))} size={100}/>
@@ -349,7 +1045,6 @@ function DashboardTab({all,totalValue,totalPL,totalPLpct,byBank,catData,live}){
       </div>
     </Section>
 
-    {/* Top 5 */}
     <Section title="Top 5 posizioni">
       {[...all].sort((a,b)=>(b.controvaloreAttuale||0)-(a.controvaloreAttuale||0)).slice(0,5).map((h,i)=>(
         <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:i<4?"0.5px solid #2a2a3e":"none"}}>
@@ -362,7 +1057,7 @@ function DashboardTab({all,totalValue,totalPL,totalPLpct,byBank,catData,live}){
           </div>
           <div style={{textAlign:"right",flexShrink:0}}>
             <div style={{fontSize:14,fontWeight:600}}>{fmtEur(h.controvaloreAttuale)}</div>
-            {h.rendimentoAnnuo!=null&&<div style={{fontSize:11,color:h.rendimentoAnnuo>=0?"#1D9E75":"#D85A30"}}>{fmtPct(h.rendimentoAnnuo)}</div>}
+            {(()=>{const ri=getRendInfo(h);return ri.valore!=null?<div style={{fontSize:11,color:ri.valore>=0?"#1D9E75":"#D85A30"}} title={ri.label}>{fmtPct(ri.valore)} {ri.tipo==="totale"?"tot":"ann"}</div>:null;})()}
           </div>
         </div>
       ))}
@@ -371,7 +1066,7 @@ function DashboardTab({all,totalValue,totalPL,totalPLpct,byBank,catData,live}){
 }
 
 // ─── TITOLI ──────────────────────────────────────────────────────────────────
-function TitoliTab({filtered,sortCol,sortDir,handleSort,fBank,setFBank,fCat,setFCat,search,setSearch,categories,live,totalValue}){
+function TitoliTab({filtered,sortCol,sortDir,handleSort,fBank,setFBank,fCat,setFCat,search,setSearch,categories,live}){
   const isMobile=useIsMobile();
   const totCV=filtered.reduce((s,h)=>s+(h.controvaloreAttuale||0),0);
   const totPL=filtered.reduce((s,h)=>s+(h.plusMinus||0),0);
@@ -409,11 +1104,11 @@ function TitoliTab({filtered,sortCol,sortDir,handleSort,fBank,setFBank,fCat,setF
               <div><div style={{fontSize:11,color:"#888",marginBottom:2}}>Controvalore</div><div style={{fontSize:16,fontWeight:600}}>{fmtEur(h.controvaloreAttuale)}</div></div>
               {e?.stimato!=null&&<div><div style={{fontSize:11,color:"#EF9F27",marginBottom:2}}>Stima ⚠</div><div style={{fontSize:15,fontWeight:500,color:e.stimato>=h.controvaloreAttuale?"#1D9E75":"#D85A30"}}>{fmtEur(e.stimato)}</div></div>}
               <div><div style={{fontSize:11,color:"#888",marginBottom:2}}>P&L</div><div style={{fontSize:14,color:h.plusMinus>0?"#1D9E75":h.plusMinus<0?"#D85A30":"#888"}}>{fmtEur(h.plusMinus)}</div></div>
-              <div><div style={{fontSize:11,color:"#888",marginBottom:2}}>Rendimento</div><div style={{fontSize:14,color:h.rendimentoAnnuo>0?"#1D9E75":h.rendimentoAnnuo<0?"#D85A30":"#888"}}>{fmtPct(h.rendimentoAnnuo)}</div></div>
+              {(()=>{const ri=getRendInfo(h);return(<div><div style={{fontSize:11,color:"#888",marginBottom:2}}>{ri.label}</div><div style={{fontSize:14,color:ri.valore>0?"#1D9E75":ri.valore<0?"#D85A30":"#888"}}>{ri.valore!=null?fmtPct(ri.valore):"—"}</div></div>);})()}
               <div><div style={{fontSize:11,color:"#888",marginBottom:2}}>Quote</div><div style={{fontSize:13}}>{h.quantita!=null?fmt(h.quantita):"—"}</div></div>
               <div><div style={{fontSize:11,color:"#888",marginBottom:2}}>P.Carico</div><div style={{fontSize:13}}>{h.prezzoCarico!=null?fmt(h.prezzoCarico,3):"—"}</div></div>
             </div>
-            {h.isin&&<div style={{fontSize:10,color:"#555",marginTop:10}}>ISIN: {h.isin}</div>}
+            {h.fonte&&<div style={{fontSize:10,color:"#555",marginTop:10,fontStyle:"italic"}}>📌 {h.fonte}</div>}
           </div>);
         })}
         {!filtered.length&&<div style={{padding:"3rem",textAlign:"center",color:"#555"}}>Nessun risultato</div>}
@@ -422,372 +1117,503 @@ function TitoliTab({filtered,sortCol,sortDir,handleSort,fBank,setFBank,fCat,setF
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",fontSize:12}}>
           <thead><tr style={{borderBottom:"0.5px solid #333"}}>
-            {[{l:"Titolo",c:"nome"},{l:"Banca",c:"banca"},{l:"Categoria",c:"categoria"},{l:"Quote",c:"quantita"},{l:"P.Carico",c:"prezzoCarico"},{l:"Controvalore",c:"controvaloreAttuale"},{l:"Stima ⚠",c:"stimato"},{l:"P&L",c:"plusMinus"},{l:"Rend.",c:"rendimentoAnnuo"}].map(({l,c})=>(
-              <th key={c} onClick={()=>c!=="stimato"&&handleSort(c)} style={{textAlign:["nome","banca","categoria"].includes(c)?"left":"right",padding:"6px 7px",color:c==="stimato"?"#EF9F27":"#888",fontWeight:500,cursor:c!=="stimato"?"pointer":"default",whiteSpace:"nowrap"}}>
-                {l}{c!=="stimato"&&<span style={{opacity:sortCol===c?1:0.3,fontSize:10,marginLeft:3}}>{sortCol===c?(sortDir==="asc"?"↑":"↓"):"↕"}</span>}
+            {[{l:"Titolo",c:"nome"},{l:"Banca",c:"banca"},{l:"Categoria",c:"categoria"},{l:"Quote",c:"quantita"},{l:"P.Carico",c:"prezzoCarico"},{l:"Controvalore",c:"controvaloreAttuale"},{l:"P&L",c:"plusMinus"},{l:"Rend.",c:"rendimento"}].map(({l,c})=>(
+              <th key={c} onClick={()=>handleSort(c==="rendimento"?"rendimentoAnnuo":c)} style={{textAlign:["nome","banca","categoria"].includes(c)?"left":"right",padding:"6px 7px",color:"#888",fontWeight:500,cursor:"pointer",whiteSpace:"nowrap"}}>
+                {l}<span style={{opacity:sortCol===c||(c==="rendimento"&&sortCol==="rendimentoAnnuo")?1:0.3,fontSize:10,marginLeft:3}}>{(sortCol===c||(c==="rendimento"&&sortCol==="rendimentoAnnuo"))?(sortDir==="asc"?"↑":"↓"):"↕"}</span>
               </th>
             ))}
           </tr></thead>
-          <tbody>{filtered.map((h,i)=>{
-            const e=live.enriched.find(x=>x.nome===h.nome);
-            return(<tr key={i} style={{borderBottom:"0.5px solid #222"}}>
-              <td style={{padding:"6px 7px",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={h.nome}>{h.nome}</td>
-              <td style={{padding:"6px 7px"}}><span style={{padding:"2px 5px",borderRadius:4,fontSize:10,background:`${BANKS[h.banca]?.color}25`,color:BANKS[h.banca]?.color}}>{h.banca}</span></td>
-              <td style={{padding:"6px 7px",color:"#888",fontSize:11}}>{h.categoria}</td>
-              <td style={{padding:"6px 7px",textAlign:"right"}}>{h.quantita!=null?fmt(h.quantita):"—"}</td>
-              <td style={{padding:"6px 7px",textAlign:"right"}}>{h.prezzoCarico!=null?fmt(h.prezzoCarico,3):"—"}</td>
-              <td style={{padding:"6px 7px",textAlign:"right",fontWeight:500}}>{fmtEur(h.controvaloreAttuale)}</td>
-              <td style={{padding:"6px 7px",textAlign:"right"}}>{e?.stimato!=null?<span style={{color:e.stimato>=h.controvaloreAttuale?"#1D9E75":"#D85A30",fontWeight:500}}>{fmtEur(e.stimato)}</span>:<span style={{color:"#555"}}>—</span>}</td>
-              <td style={{padding:"6px 7px",textAlign:"right",color:h.plusMinus>0?"#1D9E75":h.plusMinus<0?"#D85A30":"#888"}}>{fmtEur(h.plusMinus)}</td>
-              <td style={{padding:"6px 7px",textAlign:"right",color:h.rendimentoAnnuo>0?"#1D9E75":h.rendimentoAnnuo<0?"#D85A30":"#888"}}>{fmtPct(h.rendimentoAnnuo)}</td>
-            </tr>);
-          })}</tbody>
+          <tbody>{filtered.map((h,i)=>(<tr key={i} style={{borderBottom:"0.5px solid #222"}}>
+            <td style={{padding:"6px 7px",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={h.nome}>{h.nome}</td>
+            <td style={{padding:"6px 7px"}}><span style={{padding:"2px 5px",borderRadius:4,fontSize:10,background:`${BANKS[h.banca]?.color}25`,color:BANKS[h.banca]?.color}}>{h.banca}</span></td>
+            <td style={{padding:"6px 7px",color:"#888",fontSize:11}}>{h.categoria}</td>
+            <td style={{padding:"6px 7px",textAlign:"right"}}>{h.quantita!=null?fmt(h.quantita):"—"}</td>
+            <td style={{padding:"6px 7px",textAlign:"right"}}>{h.prezzoCarico!=null?fmt(h.prezzoCarico,3):"—"}</td>
+            <td style={{padding:"6px 7px",textAlign:"right",fontWeight:500}}>{fmtEur(h.controvaloreAttuale)}</td>
+            <td style={{padding:"6px 7px",textAlign:"right",color:h.plusMinus>0?"#1D9E75":h.plusMinus<0?"#D85A30":"#888"}}>{fmtEur(h.plusMinus)}</td>
+            <td style={{padding:"6px 7px",textAlign:"right"}}>{(()=>{const ri=getRendInfo(h);if(ri.valore==null)return<span style={{color:"#555"}}>—</span>;return<span style={{color:ri.valore>0?"#1D9E75":ri.valore<0?"#D85A30":"#888"}} title={ri.label}>{fmtPct(ri.valore)}<span style={{fontSize:9,marginLeft:3,opacity:0.7}}>{ri.tipo==="totale"?"tot":"ann"}</span></span>;})()}</td>
+          </tr>))}</tbody>
         </table>
       </div>
     )}
-    {live.lastUpdate&&<div style={{fontSize:11,color:"#EF9F27",marginTop:10,fontStyle:"italic"}}>⚠ Stima basata su benchmark. Non riflette il NAV reale.</div>}
   </div>);
 }
 
-// ─── ANALISI ─────────────────────────────────────────────────────────────────
-function AnalisiTab({holdings,totalValue,byCat,catData,bancaLabel}){
-  const[analysis,setAnalysis]=useState("");
+// ─── ANALISI AI ──────────────────────────────────────────────────────────────
+function AnalisiTab({holdings,totalValue,byCat,catData,bancaLabel,liveCheckLog,localValidation,apiKey}){
+  const[analysis,setAnalysis]=useState(null);
   const[loading,setLoading]=useState(false);
-  const[done,setDone]=useState(false);
   const[storico,setStorico]=useState(()=>{try{return JSON.parse(localStorage.getItem("portfolio_analisi")||"[]");}catch{return[];}});
   const[viewIdx,setViewIdx]=useState(null);
+  const[error,setError]=useState(null);
+  const[pendingResult,setPendingResult]=useState(null);
+  const[confirm,setConfirm]=useState(null);
+  const[preflightSteps,setPreflightSteps]=useState([]);
+
+  const renderMd=t=>(t||"").replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<br/>");
 
   const exportPDF=entry=>{
-    const el=document.getElementById("print-area");
-    el.innerHTML=`<h2>Analisi Portafoglio — ${entry.banca}</h2><div class="pm">Data: ${entry.data}</div><div class="pb">${entry.testo.replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<br/>")}</div><div class="pf">Portfolio Analyzer · ${new Date().toLocaleDateString("it-IT")} · Solo scopo informativo, non costituisce consulenza finanziaria.</div>`;
+    const checksHTML=(entry.controlli||[]).map(c=>`<div>• ${c}</div>`).join("");
+    document.getElementById("print-area").innerHTML=`
+      <h2>Analisi Portafoglio — ${entry.banca}</h2>
+      <div class="pm">Data: ${entry.data} · Affidabilità: ${entry.affidabilita==="green"?"🟢 Affidabile":entry.affidabilita==="yellow"?"🟡 Parziale":"🔴 Inaffidabile"}</div>
+      ${entry.controlli?.length?`<div class="checks"><strong>✓ Controlli eseguiti</strong>${checksHTML}</div>`:""}
+      <div class="pb">${renderMd(entry.testo)}</div>
+      <div class="pf">Portfolio Analyzer v${APP_VERSION} · ${new Date().toLocaleDateString("it-IT")} · Solo scopo informativo, non costituisce consulenza finanziaria.</div>`;
     window.print();
   };
-  const saveS=text=>{const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),banca:bancaLabel,testo:text};const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_analisi",JSON.stringify(u));};
+
+  const saveS=(text,controlli,affidabilita,hash)=>{
+    const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),banca:bancaLabel,testo:text,controlli,affidabilita,hash};
+    const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_analisi",JSON.stringify(u));
+  };
   const delE=id=>{const u=storico.filter(e=>e.id!==id);setStorico(u);localStorage.setItem("portfolio_analisi",JSON.stringify(u));setViewIdx(null);};
-  const delAll=()=>{setStorico([]);localStorage.removeItem("portfolio_analisi");setViewIdx(null);};
+  const askDelAll=()=>setConfirm({title:"Cancellare tutto lo storico?",message:`Stai per eliminare ${storico.length} analisi salvate. L'azione non può essere annullata.`,danger:true,onConfirm:()=>{setStorico([]);localStorage.removeItem("portfolio_analisi");setViewIdx(null);setConfirm(null);}});
+
   const run=async()=>{
-    setLoading(true);setAnalysis("");setDone(false);setViewIdx(null);
-    const summary=holdings.filter(h=>h.controvaloreAttuale>0).map(h=>`${h.nome.slice(0,35)} [${h.banca}] (${h.categoria}): ${fmtEur(h.controvaloreAttuale)}`).join("\n");
+    setError(null);setAnalysis(null);setViewIdx(null);setPendingResult(null);setPreflightSteps([]);setLoading(true);
+
+    // ── PREFLIGHT STEP-BY-STEP ──
+    const collectedSteps=[];
+    let blocked=false;
+    for await(const step of runPreflightChecks({holdings,bancaLabel,apiKey})){
+      // Aggiorna l'ultimo step se ha lo stesso numero, altrimenti aggiungi
+      const idx=collectedSteps.findIndex(s=>s.step===step.step);
+      if(idx>=0)collectedSteps[idx]=step;
+      else collectedSteps.push(step);
+      setPreflightSteps([...collectedSteps]);
+      if(step.status==="error"){
+        setError({title:`⛔ Step ${step.step} fallito: ${step.name}`,details:step.details});
+        blocked=true;break;
+      }
+    }
+    if(blocked){setLoading(false);return;}
+
+    // ── COSTRUZIONE CONTROLLI PER REPORT ──
+    const controlli=collectedSteps.filter(s=>s.status==="ok"||s.status==="warning").map(s=>{
+      const icon=s.status==="warning"?"⚠":"✓";
+      return `${icon} ${s.name}: ${s.details[0]||"verificato"}`;
+    });
+    if(liveCheckLog?.length){
+      const checked=liveCheckLog.filter(c=>c.ok&&!c.warning);
+      if(checked.length)controlli.push(`✓ Prezzi live (Yahoo+Stooq): ${checked.map(c=>c.ticker).join(", ")} · diff <1%`);
+    }
+
+    // ── GENERAZIONE AI ──
+    const summary=holdings.filter(h=>h.controvaloreAttuale>0).map(h=>{
+      const ri=getRendInfo(h);
+      const rendStr=ri.tipo==="none"?"rend n/d":(ri.tipo==="annuo"?`rend annuo ${fmtPct(ri.valore)}`:`rend totale dall'acquisto ${fmtPct(ri.valore)}`);
+      return `${h.nome.slice(0,40)} [${h.banca}] (${h.categoria}): ${fmtEur(h.controvaloreAttuale)}, P&L ${fmtEur(h.plusMinus)}, ${rendStr}`;
+    }).join("\n");
     try{
-      const text=await callAI(null,`Sei un consulente finanziario italiano esperto. Analizza questo portafoglio BILANCIATO (totale ${fmtEur(totalValue)}):\n${summary}\n\nFornisci:\n1. **Valutazione generale**\n2. **Rischi principali** (3 punti)\n3. **Opportunità** (3 punti)\n4. **Raccomandazioni** per profilo bilanciato\n5. **Previsione 2026**`);
+      const text=await callAI(null,`Sei un consulente finanziario italiano esperto. Rispondi in italiano. Analizza questo portafoglio BILANCIATO (${bancaLabel}, totale ${fmtEur(totalValue)}).\n\nNOTA IMPORTANTE: per i titoli Mediolanum il rendimento è ANNUALIZZATO (% annuo), per i titoli BPER è TOTALE dall'acquisto (non annualizzato). Tienine conto nell'analisi.\n\nTITOLI:\n${summary}\n\nFornisci:\n1. **Valutazione generale**\n2. **Rischi principali** (3 punti)\n3. **Opportunità** (3 punti)\n4. **Raccomandazioni** per profilo bilanciato\n5. **Previsione 2026**`);
       if(!text||!text.trim())throw new Error("Risposta vuota");
-      setAnalysis(text);saveS(text);setDone(true);
-    }catch(e){setAnalysis(`⚠ Errore: ${e.message}`);setDone(false);}
+      const isItalian=looksItalian(text);
+      let affidabilita="green";
+      const finalControlli=[...controlli];
+      if(!isItalian){affidabilita="yellow";finalControlli.push("⚠ Risposta AI forse non in italiano");}
+      if(collectedSteps.some(s=>s.status==="warning"))affidabilita="yellow";
+
+      const hash=dataHash(holdings.map(h=>({n:h.nome,c:h.controvaloreAttuale,p:h.plusMinus,r:h.rendimentoAnnuo,rt:h.rendimentoTotale})));
+      finalControlli.push(`Firma dati: ${hash}`);
+
+      setPendingResult({text,controlli:finalControlli,affidabilita,hash});
+    }catch(e){setError({title:"Errore generazione AI",details:[`✗ ${e.message}`,"","💡 Riprova; se persiste, verifica la API Key"]});}
     setLoading(false);
   };
-  const renderMd=t=>t.replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<br/>");
-  const az=Object.entries(byCat).filter(([k])=>k.toLowerCase().startsWith("azion")).reduce((s,[,v])=>s+v,0);
-  const ob=Object.entries(byCat).filter(([k])=>k.toLowerCase().startsWith("obblig")).reduce((s,[,v])=>s+v,0);
-  const ass=Object.entries(byCat).filter(([k])=>k.toLowerCase().includes("assicur")).reduce((s,[,v])=>s+v,0);
-  const pAz=totalValue>0?Math.round(az/totalValue*100):0;
-  const pOb=totalValue>0?Math.round(ob/totalValue*100):0;
-  const pAs=totalValue>0?Math.round(ass/totalValue*100):0;
-  const testo=viewIdx!==null?storico[viewIdx]?.testo:analysis;
+
+  const confirmSave=()=>{
+    if(!pendingResult)return;
+    saveS(pendingResult.text,pendingResult.controlli,pendingResult.affidabilita,pendingResult.hash);
+    setAnalysis(pendingResult);
+    setPendingResult(null);
+  };
+
+  const display=viewIdx!==null?storico[viewIdx]:(analysis||pendingResult);
+  const dataChanged=viewIdx!==null&&storico[viewIdx]?.hash&&storico[viewIdx].hash!==dataHash(holdings.map(h=>({n:h.nome,c:h.controvaloreAttuale,p:h.plusMinus,r:h.rendimentoAnnuo,rt:h.rendimentoTotale})));
 
   return(<div>
-    <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
-      {[{l:"Azionario",v:pAz+"%",s:"target 50–65%",a:pAz>65||pAz<50},{l:"Obbligazionario",v:pOb+"%",s:"target 30–45%",a:pOb>45||pOb<30},{l:"Assicurativo",v:pAs+"%",s:"polizze/unit linked",a:false}].map((c,i)=>(
-        <div key={i} style={{background:c.a?"#EF9F2710":"#1e2235",border:c.a?"0.5px solid #EF9F2740":"none",borderRadius:12,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div>
-            <div style={{fontSize:12,color:"#888"}}>{c.l}</div>
-            <div style={{fontSize:11,color:"#666",marginTop:2}}>{c.s}</div>
-          </div>
-          <div style={{fontSize:26,fontWeight:700,color:c.a?"#EF9F27":"white"}}>{c.v}</div>
-        </div>
-      ))}
-    </div>
-    <Section title="Distribuzione categorie">
-      {catData.map(c=>(<div key={c.label} style={{marginBottom:10}}>
-        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
-          <span style={{color:"#ccc"}}>{c.label}</span>
-          <span style={{fontWeight:600}}>{totalValue>0?Math.round(c.value/totalValue*100):0}%</span>
-        </div>
-        <div style={{height:5,borderRadius:3,background:"#2a2a3e"}}><div style={{height:"100%",borderRadius:3,background:c.color,width:totalValue>0?`${c.value/totalValue*100}%`:"0%",transition:"width .5s"}}/></div>
-      </div>))}
-    </Section>
+    <Disclaimer/>
     <Section>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:testo?16:0}}>
-        <div><div style={{fontWeight:600,fontSize:15}}>Analisi AI</div><div style={{fontSize:11,color:"#888"}}>powered by Gemini</div></div>
-        <button onClick={run} disabled={loading} style={{padding:"10px 16px",borderRadius:10,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:loading?"not-allowed":"pointer",fontSize:13,fontWeight:500}}>{loading?"In corso…":done?"Rigenera":"Avvia analisi"}</button>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:display||error?16:0}}>
+        <div><div style={{fontWeight:600,fontSize:15}}>Analisi AI</div><div style={{fontSize:11,color:"#888"}}>Validazione + Gemini</div></div>
+        <button onClick={run} disabled={loading||pendingResult} style={{padding:"10px 16px",borderRadius:10,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:(loading||pendingResult)?"not-allowed":"pointer",fontSize:13,fontWeight:500}}>{loading?"In corso…":analysis?"Rigenera":"Avvia analisi"}</button>
       </div>
-      {viewIdx!==null&&<div style={{fontSize:11,color:"#888",marginBottom:10,fontStyle:"italic"}}>📅 {storico[viewIdx]?.data} · {storico[viewIdx]?.totale}</div>}
-      {testo&&<div style={{fontSize:13,lineHeight:1.8}} dangerouslySetInnerHTML={{__html:renderMd(testo)}}/>}
-      {!testo&&!loading&&<div style={{fontSize:13,color:"#888",fontStyle:"italic",marginTop:12}}>Clicca "Avvia analisi" per ottenere una valutazione AI del tuo portafoglio.</div>}
-    </Section>
-    {storico.length>0&&(
-      <Section>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-          <div style={{fontWeight:600,fontSize:14}}>Storico ({storico.length}/5)</div>
-          <button onClick={delAll} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>Cancella tutto</button>
+      {(loading||error||preflightSteps.length>0)&&preflightSteps.length>0&&!pendingResult&&!analysis&&<PreflightView steps={preflightSteps}/>}
+      {error&&(<div style={{background:"#D85A3015",border:"0.5px solid #D85A3060",borderRadius:8,padding:"12px 14px",marginTop:8}}>
+        <div style={{fontSize:13,fontWeight:600,color:"#D85A30",marginBottom:8}}>⛔ {error.title}</div>
+        {error.details.map((d,i)=><div key={i} style={{fontSize:12,color:"#ffaaaa",lineHeight:1.6}}>{d}</div>)}
+      </div>)}
+      {pendingResult&&!viewIdx&&(<div style={{background:"#EF9F2715",border:"0.5px solid #EF9F2760",borderRadius:8,padding:"12px 14px",marginTop:8,marginBottom:8}}>
+        <div style={{fontSize:13,fontWeight:600,color:"#EF9F27",marginBottom:6}}>⏳ Verifica manuale</div>
+        <div style={{fontSize:12,color:"#ffd9a0",lineHeight:1.6,marginBottom:10}}>Analisi generata. Verifica i contenuti qui sotto e conferma per salvarla nello storico.</div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={confirmSave} style={{flex:1,padding:"8px",borderRadius:6,border:"none",background:"#1D9E75",color:"white",cursor:"pointer",fontSize:12,fontWeight:600}}>✓ Conferma e salva</button>
+          <button onClick={()=>setPendingResult(null)} style={{flex:1,padding:"8px",borderRadius:6,border:"0.5px solid #444",background:"transparent",color:"#aaa",cursor:"pointer",fontSize:12}}>Scarta</button>
         </div>
-        {storico.map((e,i)=>(
-          <div key={e.id} onClick={()=>setViewIdx(viewIdx===i?null:i)} style={{padding:"12px",borderRadius:10,marginBottom:8,background:viewIdx===i?"#2a2a3e":"#12121e",border:viewIdx===i?"0.5px solid #7F77DD":"0.5px solid #2a2a3e",cursor:"pointer"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:13,fontWeight:500}}>{e.data}</div>
-                <div style={{fontSize:12,color:"#1D9E75",marginTop:2}}>{e.banca||"—"}</div>
-              </div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={ev=>{ev.stopPropagation();exportPDF(e);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #1D9E7540",background:"transparent",color:"#1D9E75",cursor:"pointer",fontSize:12}}>PDF</button>
-                <button onClick={ev=>{ev.stopPropagation();delE(e.id);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>✕</button>
-              </div>
+      </div>)}
+      {display&&(<div>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+          {display.affidabilita&&<ReliabilityBadge level={display.affidabilita}/>}
+          {viewIdx!==null&&<span style={{fontSize:11,color:"#888"}}>📅 {storico[viewIdx]?.data} · {storico[viewIdx]?.banca}</span>}
+          {dataChanged&&<span style={{fontSize:11,color:"#EF9F27"}}>⚠ Generato con dati diversi da quelli attuali</span>}
+        </div>
+        {display.controlli&&<ControlliBox controlli={display.controlli}/>}
+        <div style={{fontSize:13,lineHeight:1.8}} dangerouslySetInnerHTML={{__html:renderMd(display.testo||display.text)}}/>
+      </div>)}
+      {!display&&!error&&!loading&&!pendingResult&&<div style={{fontSize:13,color:"#888",fontStyle:"italic",marginTop:12}}>Clicca "Avvia analisi" per generare una valutazione AI con doppio controllo.</div>}
+    </Section>
+    {storico.length>0&&(<Section>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+        <div style={{fontWeight:600,fontSize:14}}>Storico ({storico.length}/5)</div>
+        <button onClick={askDelAll} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>Cancella tutto</button>
+      </div>
+      {storico.map((e,i)=>(<div key={e.id} onClick={()=>setViewIdx(viewIdx===i?null:i)} style={{padding:"12px",borderRadius:10,marginBottom:8,background:viewIdx===i?"#2a2a3e":"#12121e",border:viewIdx===i?"0.5px solid #7F77DD":"0.5px solid #2a2a3e",cursor:"pointer"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:500}}>{e.data}</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:3,flexWrap:"wrap"}}>
+              <span style={{fontSize:12,color:"#1D9E75"}}>{e.banca||"—"}</span>
+              {e.affidabilita&&<ReliabilityBadge level={e.affidabilita}/>}
             </div>
-            {viewIdx===i&&<div style={{fontSize:13,lineHeight:1.7,marginTop:12,paddingTop:12,borderTop:"0.5px solid #333"}} dangerouslySetInnerHTML={{__html:renderMd(e.testo)}}/>}
           </div>
-        ))}
-      </Section>
-    )}
+          <div style={{display:"flex",gap:6,flexShrink:0}}>
+            <button onClick={ev=>{ev.stopPropagation();exportPDF(e);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #1D9E7540",background:"transparent",color:"#1D9E75",cursor:"pointer",fontSize:12}}>PDF</button>
+            <button onClick={ev=>{ev.stopPropagation();delE(e.id);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>✕</button>
+          </div>
+        </div>
+      </div>))}
+    </Section>)}
+    <ConfirmDialog open={!!confirm} {...(confirm||{})} onCancel={()=>setConfirm(null)}/>
   </div>);
 }
 
 // ─── PREVISIONI ──────────────────────────────────────────────────────────────
-function PrevisioniTab({holdings,totalValue,bancaLabel}){
+function PrevisioniTab({holdings,totalValue,bancaLabel,liveCheckLog,localValidation,apiKey}){
   const[scenarios,setScenarios]=useState(null);
   const[loading,setLoading]=useState(false);
-  const[perTitolo,setPerTitolo]=useState([]);
   const[storico,setStorico]=useState(()=>{try{return JSON.parse(localStorage.getItem("portfolio_previsioni")||"[]");}catch{return[];}});
   const[viewIdx,setViewIdx]=useState(null);
+  const[error,setError]=useState(null);
+  const[pendingResult,setPendingResult]=useState(null);
+  const[confirm,setConfirm]=useState(null);
+  const[preflightSteps,setPreflightSteps]=useState([]);
 
-  const rendP=holdings.length>0?holdings.reduce((s,h)=>s+getRend(h)*(h.controvaloreAttuale||0),0)/totalValue:0;
-  const today=new Date();
-  const months=[];for(let m=today.getMonth();m<=11;m++)months.push(["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"][m]);
-  const proj=rate=>months.map((_,i)=>Math.round(totalValue*Math.pow(1+rate/100/12,i)));
   const SC={base:"#1D9E75",ottimistico:"#7F77DD",pessimistico:"#D85A30"};
-
-  const saveS=json=>{
-    const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),banca:bancaLabel,json};
-    const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_previsioni",JSON.stringify(u));
-  };
-  const delE=id=>{const u=storico.filter(e=>e.id!==id);setStorico(u);localStorage.setItem("portfolio_previsioni",JSON.stringify(u));setViewIdx(null);};
-  const delAll=()=>{setStorico([]);localStorage.removeItem("portfolio_previsioni");setViewIdx(null);};
+  const today=new Date();
+  const months=12-today.getMonth();
+  const proj=rate=>Math.round(totalValue*Math.pow(1+rate/100/12,months));
 
   const exportPDF=entry=>{
     const j=entry.json;
+    const checksHTML=(entry.controlli||[]).map(c=>`<div>• ${c}</div>`).join("");
     const scenariHTML=["ottimistico","base","pessimistico"].map(key=>{
       const s=j[key];
       return `<div style="margin-bottom:12px;padding:10px;border-left:3px solid #333"><strong>${s.nome}</strong> — ${s.rendimento>=0?"+":""}${s.rendimento.toFixed(1)}%<br/>${s.motivazione}</div>`;
     }).join("");
     const raccHTML=(j.raccomandazioni||[]).map((r,i)=>`<div>${i+1}. ${r}</div>`).join("");
     document.getElementById("print-area").innerHTML=`
-      <h2>Previsioni Portafoglio — ${entry.banca}</h2>
-      <div class="pm">Data: ${entry.data}</div>
+      <h2>Previsioni — ${entry.banca}</h2>
+      <div class="pm">Data: ${entry.data} · Affidabilità: ${entry.affidabilita==="green"?"🟢 Affidabile":entry.affidabilita==="yellow"?"🟡 Parziale":"🔴 Inaffidabile"}</div>
+      ${entry.controlli?.length?`<div class="checks"><strong>✓ Controlli eseguiti</strong>${checksHTML}</div>`:""}
       <div class="pb">
         <p style="font-style:italic;color:#555;margin-bottom:12px">${j.contesto||""}</p>
         <strong>Scenari 2026</strong>${scenariHTML}
         <strong>Raccomandazioni</strong><div style="margin-top:8px">${raccHTML}</div>
       </div>
-      <div class="pf">Portfolio Analyzer · ${new Date().toLocaleDateString("it-IT")} · Solo scopo informativo, non costituisce consulenza finanziaria.</div>`;
+      <div class="pf">Portfolio Analyzer v${APP_VERSION} · ${new Date().toLocaleDateString("it-IT")} · Solo scopo informativo, non costituisce consulenza finanziaria.</div>`;
     window.print();
   };
 
+  const saveS=(json,controlli,affidabilita,hash)=>{
+    const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),banca:bancaLabel,json,controlli,affidabilita,hash};
+    const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_previsioni",JSON.stringify(u));
+  };
+  const delE=id=>{const u=storico.filter(e=>e.id!==id);setStorico(u);localStorage.setItem("portfolio_previsioni",JSON.stringify(u));setViewIdx(null);};
+  const askDelAll=()=>setConfirm({title:"Cancellare tutto lo storico?",message:`Stai per eliminare ${storico.length} previsioni. Azione non annullabile.`,danger:true,onConfirm:()=>{setStorico([]);localStorage.removeItem("portfolio_previsioni");setViewIdx(null);setConfirm(null);}});
+
   const run=async()=>{
-    setLoading(true);setScenarios(null);setViewIdx(null);
+    setError(null);setScenarios(null);setViewIdx(null);setPendingResult(null);setPreflightSteps([]);setLoading(true);
+
+    // ── PREFLIGHT STEP-BY-STEP ──
+    const collectedSteps=[];
+    let blocked=false;
+    for await(const step of runPreflightChecks({holdings,bancaLabel,apiKey})){
+      const idx=collectedSteps.findIndex(s=>s.step===step.step);
+      if(idx>=0)collectedSteps[idx]=step;
+      else collectedSteps.push(step);
+      setPreflightSteps([...collectedSteps]);
+      if(step.status==="error"){
+        setError({title:`⛔ Step ${step.step} fallito: ${step.name}`,details:step.details});
+        blocked=true;break;
+      }
+    }
+    if(blocked){setLoading(false);return;}
+
+    const controlli=collectedSteps.filter(s=>s.status==="ok"||s.status==="warning").map(s=>{
+      const icon=s.status==="warning"?"⚠":"✓";
+      return `${icon} ${s.name}: ${s.details[0]||"verificato"}`;
+    });
+
+    const rendP=holdings.length>0?holdings.reduce((s,h)=>s+getRend(h)*(h.controvaloreAttuale||0),0)/totalValue:0;
     const catBD={};holdings.forEach(h=>{catBD[h.categoria]=(catBD[h.categoria]||0)+(h.controvaloreAttuale||0);});
     try{
-      const text=await callAI("Sei un consulente finanziario italiano. Rispondi SOLO con JSON valido, senza testo prima o dopo.",`Portafoglio bilanciato, aprile 2026. Totale €${Math.round(totalValue).toLocaleString("it-IT")}. Rendimento medio: ${rendP.toFixed(2)}%. Composizione: ${Object.entries(catBD).map(([k,v])=>`${k} ${Math.round(v/totalValue*100)}%`).join(", ")}. Contesto: tensioni USA-Cina, BCE ferma. JSON: {"contesto":"...","base":{"nome":"Scenario Base","rendimento":7.5,"motivazione":"..."},"ottimistico":{"nome":"Scenario Ottimistico","rendimento":11.0,"motivazione":"..."},"pessimistico":{"nome":"Scenario Pessimistico","rendimento":2.5,"motivazione":"..."},"raccomandazioni":["...","...","..."]}`,1200);
+      const text=await callAI("Sei un consulente finanziario italiano. Rispondi SOLO con JSON valido in italiano, senza testo prima o dopo.",`Portafoglio bilanciato (${bancaLabel}), maggio 2026. Totale €${Math.round(totalValue).toLocaleString("it-IT")}. Rendimento medio: ${rendP.toFixed(2)}%. Composizione: ${Object.entries(catBD).map(([k,v])=>`${k} ${Math.round(v/totalValue*100)}%`).join(", ")}. Contesto: tensioni USA-Cina, BCE ferma. JSON: {"contesto":"...","base":{"nome":"Scenario Base","rendimento":7.5,"motivazione":"..."},"ottimistico":{"nome":"Scenario Ottimistico","rendimento":11.0,"motivazione":"..."},"pessimistico":{"nome":"Scenario Pessimistico","rendimento":2.5,"motivazione":"..."},"raccomandazioni":["...","...","..."]}`,1500);
       const json=extractJSON(text);
-      setScenarios(json);saveS(json);
-      setPerTitolo(holdings.filter(h=>h.controvaloreAttuale>0).map(h=>{const r=getRend(h);return{...h,r,v6:h.controvaloreAttuale*Math.pow(1+r/100/12,6),v12:h.controvaloreAttuale*Math.pow(1+r/100/12,12)};}).sort((a,b)=>b.controvaloreAttuale-a.controvaloreAttuale));
-    }catch(e){setScenarios({error:`Errore: ${e.message}`});}
+      const v=validatePrevisioniJSON(json,holdings);
+      if(!v.ok){
+        setError({title:"Risposta AI non valida — previsioni non generate",details:[
+          ...v.errors.map(e=>`✗ ${e}`),
+          ...v.warnings.map(w=>`⚠ ${w}`),
+          "","💡 Riprova con 'Rigenera'",
+        ]});
+        setLoading(false);return;
+      }
+      let affidabilita="green";
+      const finalControlli=[...controlli,`✓ Scenari validati: pess ${json.pessimistico.rendimento}% ≤ base ${json.base.rendimento}% ≤ ott ${json.ottimistico.rendimento}%`];
+      if(v.warnings.length>0){affidabilita="yellow";v.warnings.forEach(w=>finalControlli.push(`⚠ ${w}`));}
+      if(collectedSteps.some(s=>s.status==="warning"))affidabilita="yellow";
+
+      const hash=dataHash(holdings.map(h=>({n:h.nome,c:h.controvaloreAttuale,p:h.plusMinus,r:h.rendimentoAnnuo,rt:h.rendimentoTotale})));
+      finalControlli.push(`Firma dati: ${hash}`);
+
+      setPendingResult({json,controlli:finalControlli,affidabilita,hash});
+    }catch(e){setError({title:"Errore generazione",details:[`✗ ${e.message}`]});}
     setLoading(false);
   };
 
-  const displayScenarios=viewIdx!==null?storico[viewIdx]?.json:scenarios;
+  const confirmSave=()=>{
+    if(!pendingResult)return;
+    saveS(pendingResult.json,pendingResult.controlli,pendingResult.affidabilita,pendingResult.hash);
+    setScenarios(pendingResult);
+    setPendingResult(null);
+  };
+
+  const display=viewIdx!==null?storico[viewIdx]:(scenarios||pendingResult);
+  const displayJson=display?.json;
+  const dataChanged=viewIdx!==null&&storico[viewIdx]?.hash&&storico[viewIdx].hash!==dataHash(holdings.map(h=>({n:h.nome,c:h.controvaloreAttuale,p:h.plusMinus,r:h.rendimentoAnnuo,rt:h.rendimentoTotale})));
 
   return(<div>
-    <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
-      {[{l:"Valore oggi",v:fmtEur(totalValue),s:new Date().toLocaleDateString("it-IT")},{l:"Rendimento medio storico",v:fmtPct(rendP),s:"ponderato per controvalore"},{l:"Mesi rimanenti 2026",v:(12-today.getMonth()).toString(),s:"fino a dicembre"}].map((c,i)=>(
-        <div key={i} style={{background:"#1e2235",borderRadius:12,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{fontSize:13,color:"#aaa"}}>{c.l}<br/><span style={{fontSize:11,color:"#666"}}>{c.s}</span></div>
-          <div style={{fontSize:22,fontWeight:700}}>{c.v}</div>
+    <Disclaimer/>
+    <Section>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div><div style={{fontWeight:600,fontSize:15}}>Scenari AI</div><div style={{fontSize:11,color:"#888"}}>Validazione + Gemini</div></div>
+        <button onClick={run} disabled={loading||pendingResult} style={{padding:"10px 16px",borderRadius:10,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:(loading||pendingResult)?"not-allowed":"pointer",fontSize:13,fontWeight:500}}>{loading?"In corso…":scenarios?"Rigenera":"Avvia"}</button>
+      </div>
+      {(loading||error||preflightSteps.length>0)&&preflightSteps.length>0&&!pendingResult&&!scenarios&&<PreflightView steps={preflightSteps}/>}
+      {error&&(<div style={{background:"#D85A3015",border:"0.5px solid #D85A3060",borderRadius:8,padding:"12px 14px",marginTop:12}}>
+        <div style={{fontSize:13,fontWeight:600,color:"#D85A30",marginBottom:8}}>⛔ {error.title}</div>
+        {error.details.map((d,i)=><div key={i} style={{fontSize:12,color:"#ffaaaa",lineHeight:1.6}}>{d}</div>)}
+      </div>)}
+      {pendingResult&&(<div style={{background:"#EF9F2715",border:"0.5px solid #EF9F2760",borderRadius:8,padding:"12px 14px",marginTop:12}}>
+        <div style={{fontSize:13,fontWeight:600,color:"#EF9F27",marginBottom:6}}>⏳ Verifica manuale</div>
+        <div style={{fontSize:12,color:"#ffd9a0",lineHeight:1.6,marginBottom:10}}>Verifica gli scenari qui sotto e conferma per salvare.</div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={confirmSave} style={{flex:1,padding:"8px",borderRadius:6,border:"none",background:"#1D9E75",color:"white",cursor:"pointer",fontSize:12,fontWeight:600}}>✓ Conferma e salva</button>
+          <button onClick={()=>setPendingResult(null)} style={{flex:1,padding:"8px",borderRadius:6,border:"0.5px solid #444",background:"transparent",color:"#aaa",cursor:"pointer",fontSize:12}}>Scarta</button>
         </div>
-      ))}
-    </div>
-    {displayScenarios&&!displayScenarios.error&&(
-      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+      </div>)}
+      {display&&displayJson&&(<div style={{marginTop:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+          {display.affidabilita&&<ReliabilityBadge level={display.affidabilita}/>}
+          {viewIdx!==null&&<span style={{fontSize:11,color:"#888"}}>📅 {storico[viewIdx]?.data} · {storico[viewIdx]?.banca}</span>}
+          {dataChanged&&<span style={{fontSize:11,color:"#EF9F27"}}>⚠ Generato con dati diversi</span>}
+        </div>
+        {display.controlli&&<ControlliBox controlli={display.controlli}/>}
         {["ottimistico","base","pessimistico"].map(key=>{
-          const s=displayScenarios[key],color=SC[key],val=proj(s.rendimento).at(-1);
-          return(<div key={key} style={{background:"#1e2235",borderRadius:12,padding:"14px 16px",borderLeft:`3px solid ${color}`}}>
+          const s=displayJson[key],color=SC[key];
+          return(<div key={key} style={{background:"#12121e",borderRadius:10,padding:"12px 14px",borderLeft:`3px solid ${color}`,marginBottom:8}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{flex:1,marginRight:12}}><div style={{fontSize:12,color:"#888"}}>{s.nome}</div><div style={{fontSize:11,color:"#aaa",marginTop:4}}>{s.motivazione}</div></div>
               <div style={{textAlign:"right",flexShrink:0}}>
-                <div style={{fontSize:18,fontWeight:700,color}}>{fmtEur(val)}</div>
+                <div style={{fontSize:18,fontWeight:700,color}}>{fmtEur(proj(s.rendimento))}</div>
                 <div style={{fontSize:12,color:"#888"}}>{s.rendimento>=0?"+":""}{s.rendimento.toFixed(1)}%</div>
               </div>
             </div>
           </div>);
         })}
-      </div>
-    )}
-    <Section>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <div><div style={{fontWeight:600,fontSize:15}}>Scenari AI</div><div style={{fontSize:11,color:"#888"}}>Gemini analizza il contesto 2026</div></div>
-        <button onClick={run} disabled={loading} style={{padding:"10px 16px",borderRadius:10,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:loading?"not-allowed":"pointer",fontSize:13,fontWeight:500}}>{loading?"In corso…":scenarios?"Aggiorna":"Avvia"}</button>
-      </div>
-      {displayScenarios?.error&&<div style={{color:"#D85A30",fontSize:13,marginTop:12}}>{displayScenarios.error}</div>}
-      {displayScenarios&&!displayScenarios.error&&displayScenarios.raccomandazioni&&(
-        <div style={{marginTop:16,paddingTop:16,borderTop:"0.5px solid #2a2a3e"}}>
-          {viewIdx!==null&&<div style={{fontSize:11,color:"#888",marginBottom:10,fontStyle:"italic"}}>📅 {storico[viewIdx]?.data} · {storico[viewIdx]?.totale}</div>}
-          <div style={{fontSize:13,color:"#888",fontStyle:"italic",marginBottom:12}}>{displayScenarios.contesto}</div>
+        {displayJson.raccomandazioni&&(<div style={{marginTop:12,paddingTop:12,borderTop:"0.5px solid #2a2a3e"}}>
+          <div style={{fontSize:13,color:"#888",fontStyle:"italic",marginBottom:12}}>{displayJson.contesto}</div>
           <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>Raccomandazioni</div>
-          {displayScenarios.raccomandazioni.map((r,i)=>(
-            <div key={i} style={{display:"flex",gap:10,marginBottom:8,fontSize:13}}>
-              <span style={{color:"#1D9E75",fontWeight:600,flexShrink:0}}>{i+1}.</span>
-              <span style={{color:"#aaa",lineHeight:1.6}}>{r}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {!displayScenarios&&!loading&&<div style={{fontSize:13,color:"#888",fontStyle:"italic",marginTop:12}}>Clicca "Avvia" per generare scenari di previsione AI.</div>}
+          {displayJson.raccomandazioni.map((r,i)=>(<div key={i} style={{display:"flex",gap:10,marginBottom:8,fontSize:13}}>
+            <span style={{color:"#1D9E75",fontWeight:600,flexShrink:0}}>{i+1}.</span>
+            <span style={{color:"#aaa",lineHeight:1.6}}>{r}</span>
+          </div>))}
+        </div>)}
+      </div>)}
+      {!display&&!error&&!loading&&!pendingResult&&<div style={{fontSize:13,color:"#888",fontStyle:"italic",marginTop:12}}>Clicca "Avvia" per generare scenari validati.</div>}
     </Section>
-    {storico.length>0&&(
-      <Section>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-          <div style={{fontWeight:600,fontSize:14}}>Storico ({storico.length}/5)</div>
-          <button onClick={delAll} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>Cancella tutto</button>
+    {storico.length>0&&(<Section>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+        <div style={{fontWeight:600,fontSize:14}}>Storico ({storico.length}/5)</div>
+        <button onClick={askDelAll} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>Cancella tutto</button>
+      </div>
+      {storico.map((e,i)=>(<div key={e.id} onClick={()=>setViewIdx(viewIdx===i?null:i)} style={{padding:"12px",borderRadius:10,marginBottom:8,background:viewIdx===i?"#2a2a3e":"#12121e",border:viewIdx===i?"0.5px solid #7F77DD":"0.5px solid #2a2a3e",cursor:"pointer"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:500}}>{e.data}</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:3,flexWrap:"wrap"}}>
+              <span style={{fontSize:12,color:"#1D9E75"}}>{e.banca||"—"}</span>
+              {e.affidabilita&&<ReliabilityBadge level={e.affidabilita}/>}
+            </div>
+          </div>
+          <div style={{display:"flex",gap:6,flexShrink:0}}>
+            <button onClick={ev=>{ev.stopPropagation();exportPDF(e);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #1D9E7540",background:"transparent",color:"#1D9E75",cursor:"pointer",fontSize:12}}>PDF</button>
+            <button onClick={ev=>{ev.stopPropagation();delE(e.id);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>✕</button>
+          </div>
         </div>
-        {storico.map((e,i)=>(
-          <div key={e.id} onClick={()=>setViewIdx(viewIdx===i?null:i)} style={{padding:"12px",borderRadius:10,marginBottom:8,background:viewIdx===i?"#2a2a3e":"#12121e",border:viewIdx===i?"0.5px solid #7F77DD":"0.5px solid #2a2a3e",cursor:"pointer"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div><div style={{fontSize:13,fontWeight:500}}>{e.data}</div><div style={{fontSize:12,color:"#1D9E75",marginTop:2}}>{e.banca||"—"}</div></div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={ev=>{ev.stopPropagation();exportPDF(e);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #1D9E7540",background:"transparent",color:"#1D9E75",cursor:"pointer",fontSize:12}}>PDF</button>
-                <button onClick={ev=>{ev.stopPropagation();delE(e.id);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>✕</button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </Section>
-    )}
-    {perTitolo.length>0&&(
-      <Section title="Stima per titolo">
-        {perTitolo.map((h,i)=>(
-          <div key={i} style={{padding:"10px 0",borderBottom:i<perTitolo.length-1?"0.5px solid #2a2a3e":"none"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-              <div style={{flex:1,marginRight:12}}><div style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.nome}</div><div style={{fontSize:11,color:"#888",marginTop:2}}>{h.categoria} · rend. {fmtPct(h.r)}</div></div>
-              <div style={{fontSize:14,fontWeight:600,flexShrink:0}}>{fmtEur(h.controvaloreAttuale)}</div>
-            </div>
-            <div style={{display:"flex",gap:12}}>
-              <div style={{flex:1,background:"#2a2a3e",borderRadius:8,padding:"8px 10px"}}><div style={{fontSize:10,color:"#888"}}>+6 mesi</div><div style={{fontSize:14,fontWeight:600,color:h.v6>=h.controvaloreAttuale?"#1D9E75":"#D85A30"}}>{fmtEur(h.v6)}</div></div>
-              <div style={{flex:1,background:"#2a2a3e",borderRadius:8,padding:"8px 10px"}}><div style={{fontSize:10,color:"#888"}}>+12 mesi</div><div style={{fontSize:14,fontWeight:600,color:h.v12>=h.controvaloreAttuale?"#1D9E75":"#D85A30"}}>{fmtEur(h.v12)}</div></div>
-            </div>
-          </div>
-        ))}
-      </Section>
-    )}
+      </div>))}
+    </Section>)}
+    <ConfirmDialog open={!!confirm} {...(confirm||{})} onCancel={()=>setConfirm(null)}/>
   </div>);
 }
 
 // ─── AZIONI ──────────────────────────────────────────────────────────────────
-function AzioniTab({holdings,totalValue,byCat,bancaLabel}){
+function AzioniTab({holdings,totalValue,byCat,bancaLabel,liveCheckLog,localValidation,apiKey}){
   const[actions,setActions]=useState(null);
   const[loading,setLoading]=useState(false);
   const[expanded,setExpanded]=useState(null);
   const[filterTipo,setFilterTipo]=useState("tutti");
   const[storico,setStorico]=useState(()=>{try{return JSON.parse(localStorage.getItem("portfolio_azioni")||"[]");}catch{return[];}});
   const[viewIdx,setViewIdx]=useState(null);
+  const[error,setError]=useState(null);
+  const[pendingResult,setPendingResult]=useState(null);
+  const[confirm,setConfirm]=useState(null);
+  const[preflightSteps,setPreflightSteps]=useState([]);
 
   const az=Object.entries(byCat).filter(([k])=>k.toLowerCase().startsWith("azion")).reduce((s,[,v])=>s+v,0);
   const ob=Object.entries(byCat).filter(([k])=>k.toLowerCase().startsWith("obblig")).reduce((s,[,v])=>s+v,0);
   const pAz=totalValue>0?(az/totalValue*100).toFixed(1):0;
   const pOb=totalValue>0?(ob/totalValue*100).toFixed(1):0;
 
-  const saveS=json=>{
-    const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),banca:bancaLabel,json};
-    const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_azioni",JSON.stringify(u));
-  };
-  const delE=id=>{const u=storico.filter(e=>e.id!==id);setStorico(u);localStorage.setItem("portfolio_azioni",JSON.stringify(u));setViewIdx(null);};
-  const delAll=()=>{setStorico([]);localStorage.removeItem("portfolio_azioni");setViewIdx(null);};
-
   const exportPDF=entry=>{
     const j=entry.json;
+    const checksHTML=(entry.controlli||[]).map(c=>`<div>• ${c}</div>`).join("");
     const titoliHTML=(j.titoli||[]).map(t=>`<div style="margin-bottom:10px;padding:8px;border-left:3px solid #ccc"><strong>${t.nome}</strong> — <em>${t.azione}</em> (priorità: ${t.priorita})<br/>${t.motivazione}<br/><strong>Cosa fare:</strong> ${t.cosa_fare}</div>`).join("");
     document.getElementById("print-area").innerHTML=`
       <h2>Piano d'Azione — ${entry.banca}</h2>
-      <div class="pm">Data: ${entry.data}</div>
+      <div class="pm">Data: ${entry.data} · Affidabilità: ${entry.affidabilita==="green"?"🟢 Affidabile":entry.affidabilita==="yellow"?"🟡 Parziale":"🔴 Inaffidabile"}</div>
+      ${entry.controlli?.length?`<div class="checks"><strong>✓ Controlli eseguiti</strong>${checksHTML}</div>`:""}
       <div class="pb">
         <p style="font-style:italic;color:#555;margin-bottom:12px">${j.sommario||""}</p>
         ${j.ribilanciamento?`<p style="margin-bottom:12px"><strong>Ribilanciamento:</strong> ${j.ribilanciamento}</p>`:""}
         <strong>Titoli</strong><div style="margin-top:8px">${titoliHTML}</div>
       </div>
-      <div class="pf">Portfolio Analyzer · ${new Date().toLocaleDateString("it-IT")} · Solo scopo informativo, non costituisce consulenza finanziaria.</div>`;
+      <div class="pf">Portfolio Analyzer v${APP_VERSION} · ${new Date().toLocaleDateString("it-IT")} · Solo scopo informativo, non costituisce consulenza finanziaria.</div>`;
     window.print();
   };
 
+  const saveS=(json,controlli,affidabilita,hash)=>{
+    const e={id:Date.now(),data:new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}),banca:bancaLabel,json,controlli,affidabilita,hash};
+    const u=[e,...storico].slice(0,5);setStorico(u);localStorage.setItem("portfolio_azioni",JSON.stringify(u));
+  };
+  const delE=id=>{const u=storico.filter(e=>e.id!==id);setStorico(u);localStorage.setItem("portfolio_azioni",JSON.stringify(u));setViewIdx(null);};
+  const askDelAll=()=>setConfirm({title:"Cancellare tutto lo storico?",message:`Stai per eliminare ${storico.length} piani. Azione non annullabile.`,danger:true,onConfirm:()=>{setStorico([]);localStorage.removeItem("portfolio_azioni");setViewIdx(null);setConfirm(null);}});
+
   const run=async()=>{
-    setLoading(true);setActions(null);setExpanded(null);setViewIdx(null);
+    setError(null);setActions(null);setExpanded(null);setViewIdx(null);setPendingResult(null);setPreflightSteps([]);setLoading(true);
+
+    // ── PREFLIGHT STEP-BY-STEP ──
+    const collectedSteps=[];
+    let blocked=false;
+    for await(const step of runPreflightChecks({holdings,bancaLabel,apiKey})){
+      const idx=collectedSteps.findIndex(s=>s.step===step.step);
+      if(idx>=0)collectedSteps[idx]=step;
+      else collectedSteps.push(step);
+      setPreflightSteps([...collectedSteps]);
+      if(step.status==="error"){
+        setError({title:`⛔ Step ${step.step} fallito: ${step.name}`,details:step.details});
+        blocked=true;break;
+      }
+    }
+    if(blocked){setLoading(false);return;}
+
+    const controlli=collectedSteps.filter(s=>s.status==="ok"||s.status==="warning").map(s=>{
+      const icon=s.status==="warning"?"⚠":"✓";
+      return `${icon} ${s.name}: ${s.details[0]||"verificato"}`;
+    });
+    controlli.push(`✓ Allocazione: Azionario ${pAz}% (target 50-65%) · Obbligazionario ${pOb}% (target 30-45%)`);
+
     const righe=holdings.filter(h=>h.controvaloreAttuale>0).map((h,i)=>{
-      const nome=h.nome.length>40?h.nome.slice(0,40):h.nome;
       const peso=totalValue>0?(h.controvaloreAttuale/totalValue*100).toFixed(1):0;
-      return `${i+1}. ${nome} [${h.banca}] | ${h.categoria} | €${Math.round(h.controvaloreAttuale)} (${peso}%) | rend:${h.rendimentoAnnuo!=null?h.rendimentoAnnuo+"%":"n/d"}`;
+      const ri=getRendInfo(h);
+      const rendStr=ri.tipo==="none"?"rend:n/d":(ri.tipo==="annuo"?`rend.annuo:${ri.valore.toFixed(2)}%`:`rend.totale:${ri.valore.toFixed(2)}%`);
+      return `${i+1}. ${h.nome.slice(0,40)} [${h.banca}] | ${h.categoria} | €${Math.round(h.controvaloreAttuale)} (${peso}%) | ${rendStr}`;
     }).join("\n");
     try{
-      const text=await callAI("Sei un consulente finanziario italiano. Rispondi SOLO con JSON valido, senza testo prima o dopo.",`Portafoglio BILANCIATO, aprile 2026. Totale €${Math.round(totalValue).toLocaleString("it-IT")}. Azionario ${pAz}% (target 50-65%), Obbligazionario ${pOb}% (target 30-45%). Contesto: tensioni USA-Cina, BCE ferma.\n\nTITOLI:\n${righe}\n\nPer ogni titolo azione (vendi/monitora/mantieni/incrementa/switch) e priorità (alta/media/bassa). JSON: {"sommario":"...","ribilanciamento":"...","titoli":[{"nome":"...","azione":"mantieni","priorita":"media","motivazione":"...","cosa_fare":"..."}]}`,4000);
+      const text=await callAI("Sei un consulente finanziario italiano. Rispondi SOLO con JSON valido in italiano, senza testo prima o dopo.",`Portafoglio BILANCIATO (${bancaLabel}), maggio 2026. Totale €${Math.round(totalValue).toLocaleString("it-IT")}. Azionario ${pAz}% (target 50-65%), Obbligazionario ${pOb}% (target 30-45%).\n\nNOTA: 'rend.annuo' = rendimento annualizzato (Mediolanum). 'rend.totale' = rendimento totale dall'acquisto, NON annualizzato (BPER).\n\nTITOLI:\n${righe}\n\nUsa esattamente i nomi dei titoli forniti. Per ogni titolo azione (vendi/monitora/mantieni/incrementa/switch) e priorità (alta/media/bassa). JSON: {"sommario":"...","ribilanciamento":"...","titoli":[{"nome":"...","azione":"mantieni","priorita":"media","motivazione":"...","cosa_fare":"..."}]}`,4000);
       const json=extractJSON(text);
-      if(!json.titoli||!Array.isArray(json.titoli))throw new Error("Struttura non valida");
-      setActions(json);saveS(json);
-    }catch(e){setActions({error:`Errore: ${e.message}`});}
+      const v=validateAzioniJSON(json,holdings);
+      if(v.errors.length>0){
+        setError({title:"Risposta AI non valida — piano non generato",details:[
+          ...v.errors.map(e=>`✗ ${e}`),
+          "","💡 Riprova con 'Rigenera'",
+        ]});
+        setLoading(false);return;
+      }
+      let affidabilita="green";
+      const finalControlli=[...controlli,`✓ Titoli analizzati dall'AI: ${json.titoli.length}`];
+      if(v.warnings.length>0){affidabilita="yellow";v.warnings.slice(0,3).forEach(w=>finalControlli.push(`⚠ ${w}`));}
+      if(collectedSteps.some(s=>s.status==="warning"))affidabilita="yellow";
+
+      const hash=dataHash(holdings.map(h=>({n:h.nome,c:h.controvaloreAttuale,p:h.plusMinus,r:h.rendimentoAnnuo,rt:h.rendimentoTotale})));
+      finalControlli.push(`Firma dati: ${hash}`);
+
+      setPendingResult({json,controlli:finalControlli,affidabilita,hash});
+    }catch(e){setError({title:"Errore generazione AI",details:[`✗ ${e.message}`]});}
     setLoading(false);
   };
 
-  const displayActions=viewIdx!==null?storico[viewIdx]?.json:actions;
-  const tf=displayActions?.titoli?.filter(t=>filterTipo==="tutti"||t.azione===filterTipo)??[];
-  const cnt=displayActions?.titoli?Object.keys(AZIONE_META).reduce((a,k)=>{a[k]=displayActions.titoli.filter(t=>t.azione===k).length;return a;},{}):{}; 
+  const confirmSave=()=>{
+    if(!pendingResult)return;
+    saveS(pendingResult.json,pendingResult.controlli,pendingResult.affidabilita,pendingResult.hash);
+    setActions(pendingResult);
+    setPendingResult(null);
+  };
+
+  const display=viewIdx!==null?storico[viewIdx]:(actions||pendingResult);
+  const displayJson=display?.json;
+  const dataChanged=viewIdx!==null&&storico[viewIdx]?.hash&&storico[viewIdx].hash!==dataHash(holdings.map(h=>({n:h.nome,c:h.controvaloreAttuale,p:h.plusMinus,r:h.rendimentoAnnuo,rt:h.rendimentoTotale})));
+  const tf=displayJson?.titoli?.filter(t=>filterTipo==="tutti"||t.azione===filterTipo)??[];
+  const cnt=displayJson?.titoli?Object.keys(AZIONE_META).reduce((a,k)=>{a[k]=displayJson.titoli.filter(t=>t.azione===k).length;return a;},{}):{}; 
 
   return(<div>
-    <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
-      {[{l:"Azionario",v:pAz+"%",s:"target 50–65%",a:pAz>65||pAz<50},{l:"Obbligazionario",v:pOb+"%",s:"target 30–45%",a:pOb>45||pOb<30}].map((c,i)=>(
-        <div key={i} style={{background:c.a?"#EF9F2710":"#1e2235",border:c.a?"0.5px solid #EF9F2740":"none",borderRadius:12,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div><div style={{fontSize:13,color:"#aaa"}}>{c.l}</div><div style={{fontSize:11,color:"#666",marginTop:2}}>{c.s}</div></div>
-          <div style={{fontSize:26,fontWeight:700,color:c.a?"#EF9F27":"white"}}>{c.v}</div>
-        </div>
-      ))}
-    </div>
+    <Disclaimer/>
     <Section>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <div><div style={{fontWeight:600,fontSize:15}}>Piano d'Azione AI</div><div style={{fontSize:11,color:"#888"}}>{holdings.filter(h=>h.controvaloreAttuale>0).length} titoli da analizzare</div></div>
-        <button onClick={run} disabled={loading} style={{padding:"10px 16px",borderRadius:10,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:loading?"not-allowed":"pointer",fontSize:13,fontWeight:500}}>{loading?"In corso…":actions?"Aggiorna":"Avvia"}</button>
+        <div><div style={{fontWeight:600,fontSize:15}}>Piano d'Azione AI</div><div style={{fontSize:11,color:"#888"}}>Validazione + Gemini</div></div>
+        <button onClick={run} disabled={loading||pendingResult} style={{padding:"10px 16px",borderRadius:10,border:"0.5px solid #444",background:"#2a2a3e",color:"white",cursor:(loading||pendingResult)?"not-allowed":"pointer",fontSize:13,fontWeight:500}}>{loading?"In corso…":actions?"Rigenera":"Avvia"}</button>
       </div>
-      {!displayActions&&!loading&&<div style={{fontSize:13,color:"#888",fontStyle:"italic",marginTop:12}}>Clicca "Avvia" per ottenere il piano d'azione titolo per titolo.</div>}
-      {loading&&<div style={{fontSize:13,color:"#888",marginTop:12}}>Gemini sta analizzando ogni titolo…</div>}
-      {displayActions?.error&&<div style={{color:"#D85A30",fontSize:13,marginTop:12}}>{displayActions.error}</div>}
-      {displayActions&&!displayActions.error&&(
-        <div style={{marginTop:16,paddingTop:16,borderTop:"0.5px solid #2a2a3e"}}>
-          {viewIdx!==null&&<div style={{fontSize:11,color:"#888",marginBottom:10,fontStyle:"italic"}}>📅 {storico[viewIdx]?.data} · {storico[viewIdx]?.totale}</div>}
-          <div style={{fontSize:13,color:"#aaa",fontStyle:"italic",marginBottom:12}}>{displayActions.sommario}</div>
-          {displayActions.ribilanciamento&&<div style={{background:"#12121e",border:"0.5px solid #7F77DD40",borderRadius:10,padding:"10px 12px",marginBottom:14,fontSize:13}}><span style={{fontWeight:600,color:"#7F77DD",marginRight:6}}>Ribilanciamento:</span><span style={{color:"#aaa"}}>{displayActions.ribilanciamento}</span></div>}
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            <button onClick={()=>setFilterTipo("tutti")} style={{padding:"5px 12px",borderRadius:20,fontSize:12,cursor:"pointer",border:filterTipo==="tutti"?"1px solid #888":"0.5px solid #333",background:filterTipo==="tutti"?"#2a2a3e":"transparent",color:"white"}}>Tutti ({displayActions.titoli?.length??0})</button>
-            {Object.entries(AZIONE_META).filter(([k])=>(cnt[k]??0)>0).map(([key,meta])=>(
-              <button key={key} onClick={()=>setFilterTipo(key)} style={{padding:"5px 12px",borderRadius:20,fontSize:12,cursor:"pointer",border:filterTipo===key?`1px solid ${meta.color}`:`0.5px solid ${meta.color}40`,background:filterTipo===key?meta.bg:"transparent",color:meta.color}}>
-                {meta.icon} {meta.label} ({cnt[key]})
-              </button>
-            ))}
-          </div>
+      {(loading||error||preflightSteps.length>0)&&preflightSteps.length>0&&!pendingResult&&!actions&&<PreflightView steps={preflightSteps}/>}
+      {error&&(<div style={{background:"#D85A3015",border:"0.5px solid #D85A3060",borderRadius:8,padding:"12px 14px",marginTop:12}}>
+        <div style={{fontSize:13,fontWeight:600,color:"#D85A30",marginBottom:8}}>⛔ {error.title}</div>
+        {error.details.map((d,i)=><div key={i} style={{fontSize:12,color:"#ffaaaa",lineHeight:1.6}}>{d}</div>)}
+      </div>)}
+      {pendingResult&&(<div style={{background:"#EF9F2715",border:"0.5px solid #EF9F2760",borderRadius:8,padding:"12px 14px",marginTop:12}}>
+        <div style={{fontSize:13,fontWeight:600,color:"#EF9F27",marginBottom:6}}>⏳ Verifica manuale</div>
+        <div style={{fontSize:12,color:"#ffd9a0",lineHeight:1.6,marginBottom:10}}>Verifica il piano qui sotto e conferma per salvare.</div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={confirmSave} style={{flex:1,padding:"8px",borderRadius:6,border:"none",background:"#1D9E75",color:"white",cursor:"pointer",fontSize:12,fontWeight:600}}>✓ Conferma e salva</button>
+          <button onClick={()=>setPendingResult(null)} style={{flex:1,padding:"8px",borderRadius:6,border:"0.5px solid #444",background:"transparent",color:"#aaa",cursor:"pointer",fontSize:12}}>Scarta</button>
         </div>
-      )}
+      </div>)}
+      {display&&displayJson&&(<div style={{marginTop:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+          {display.affidabilita&&<ReliabilityBadge level={display.affidabilita}/>}
+          {viewIdx!==null&&<span style={{fontSize:11,color:"#888"}}>📅 {storico[viewIdx]?.data} · {storico[viewIdx]?.banca}</span>}
+          {dataChanged&&<span style={{fontSize:11,color:"#EF9F27"}}>⚠ Generato con dati diversi</span>}
+        </div>
+        {display.controlli&&<ControlliBox controlli={display.controlli}/>}
+        <div style={{fontSize:13,color:"#aaa",fontStyle:"italic",marginBottom:12}}>{displayJson.sommario}</div>
+        {displayJson.ribilanciamento&&<div style={{background:"#12121e",border:"0.5px solid #7F77DD40",borderRadius:10,padding:"10px 12px",marginBottom:14,fontSize:13}}><span style={{fontWeight:600,color:"#7F77DD",marginRight:6}}>Ribilanciamento:</span><span style={{color:"#aaa"}}>{displayJson.ribilanciamento}</span></div>}
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <button onClick={()=>setFilterTipo("tutti")} style={{padding:"5px 12px",borderRadius:20,fontSize:12,cursor:"pointer",border:filterTipo==="tutti"?"1px solid #888":"0.5px solid #333",background:filterTipo==="tutti"?"#2a2a3e":"transparent",color:"white"}}>Tutti ({displayJson.titoli?.length??0})</button>
+          {Object.entries(AZIONE_META).filter(([k])=>(cnt[k]??0)>0).map(([key,meta])=>(<button key={key} onClick={()=>setFilterTipo(key)} style={{padding:"5px 12px",borderRadius:20,fontSize:12,cursor:"pointer",border:filterTipo===key?`1px solid ${meta.color}`:`0.5px solid ${meta.color}40`,background:filterTipo===key?meta.bg:"transparent",color:meta.color}}>{meta.icon} {meta.label} ({cnt[key]})</button>))}
+        </div>
+      </div>)}
+      {!display&&!error&&!loading&&!pendingResult&&<div style={{fontSize:13,color:"#888",fontStyle:"italic",marginTop:12}}>Clicca "Avvia" per generare il piano d'azione validato.</div>}
     </Section>
-    {/* Storico */}
-    {storico.length>0&&(
-      <Section>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-          <div style={{fontWeight:600,fontSize:14}}>Storico ({storico.length}/5)</div>
-          <button onClick={delAll} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>Cancella tutto</button>
-        </div>
-        {storico.map((e,i)=>(
-          <div key={e.id} onClick={()=>{setViewIdx(viewIdx===i?null:i);setExpanded(null);}} style={{padding:"12px",borderRadius:10,marginBottom:8,background:viewIdx===i?"#2a2a3e":"#12121e",border:viewIdx===i?"0.5px solid #7F77DD":"0.5px solid #2a2a3e",cursor:"pointer"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div><div style={{fontSize:13,fontWeight:500}}>{e.data}</div><div style={{fontSize:12,color:"#1D9E75",marginTop:2}}>{e.banca||"—"}</div><div style={{fontSize:11,color:"#888",marginTop:1}}>{e.json?.titoli?.length??0} titoli</div></div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={ev=>{ev.stopPropagation();exportPDF(e);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #1D9E7540",background:"transparent",color:"#1D9E75",cursor:"pointer",fontSize:12}}>PDF</button>
-                <button onClick={ev=>{ev.stopPropagation();delE(e.id);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>✕</button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </Section>
-    )}
-    {tf.length>0&&(<div style={{display:"flex",flexDirection:"column",gap:8}}>
+    {tf.length>0&&(<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
       {tf.map((t,i)=>{
         const meta=AZIONE_META[t.azione]??AZIONE_META.mantieni;
         const h=holdings.find(x=>x.nome===t.nome||x.nome.toLowerCase().startsWith(t.nome.toLowerCase().slice(0,20)));
@@ -800,11 +1626,13 @@ function AzioniTab({holdings,totalValue,byCat,bancaLabel}){
               <div style={{flex:1,fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.nome}</div>
               <div style={{fontSize:12,color:"#888",flexShrink:0}}>{open?"▲":"▼"}</div>
             </div>
-            {h&&<div style={{fontSize:13,color:"#888",marginTop:6}}>{fmtEur(h.controvaloreAttuale)} · {totalValue>0?(h.controvaloreAttuale/totalValue*100).toFixed(1):"—"}%</div>}
+            {h&&<div style={{fontSize:12,color:"#888",marginTop:6}}>{fmtEur(h.controvaloreAttuale)} · {totalValue>0?(h.controvaloreAttuale/totalValue*100).toFixed(1):"—"}% · 📌 {h.fonte||""}</div>}
+            {!h&&<div style={{fontSize:11,color:"#EF9F27",marginTop:6}}>⚠ Titolo non trovato esattamente nel portafoglio</div>}
           </div>
           {open&&(<div style={{padding:"0 14px 14px",borderTop:"0.5px solid #2a2a3e"}}>
-            <div style={{paddingTop:12,display:"flex",flexDirection:"column",gap:12}}>
-              <div><div style={{fontSize:11,color:"#888",fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.5px"}}>Motivazione</div><div style={{fontSize:13,lineHeight:1.7,color:"#ccc"}}>{t.motivazione}</div></div>
+            <div style={{paddingTop:12}}>
+              <div style={{fontSize:11,color:"#888",fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.5px"}}>Motivazione</div>
+              <div style={{fontSize:13,lineHeight:1.7,color:"#ccc",marginBottom:12}}>{t.motivazione}</div>
               <div style={{background:meta.bg,borderRadius:10,padding:"12px",border:`0.5px solid ${meta.color}30`}}>
                 <div style={{fontSize:11,color:meta.color,fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.5px"}}>Cosa fare</div>
                 <div style={{fontSize:13,lineHeight:1.7}}>{t.cosa_fare}</div>
@@ -814,99 +1642,33 @@ function AzioniTab({holdings,totalValue,byCat,bancaLabel}){
         </div>);
       })}
     </div>)}
+    {storico.length>0&&(<Section>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+        <div style={{fontWeight:600,fontSize:14}}>Storico ({storico.length}/5)</div>
+        <button onClick={askDelAll} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>Cancella tutto</button>
+      </div>
+      {storico.map((e,i)=>(<div key={e.id} onClick={()=>{setViewIdx(viewIdx===i?null:i);setExpanded(null);}} style={{padding:"12px",borderRadius:10,marginBottom:8,background:viewIdx===i?"#2a2a3e":"#12121e",border:viewIdx===i?"0.5px solid #7F77DD":"0.5px solid #2a2a3e",cursor:"pointer"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:500}}>{e.data}</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:3,flexWrap:"wrap"}}>
+              <span style={{fontSize:12,color:"#1D9E75"}}>{e.banca||"—"}</span>
+              {e.affidabilita&&<ReliabilityBadge level={e.affidabilita}/>}
+              <span style={{fontSize:11,color:"#888"}}>{e.json?.titoli?.length||0} titoli</span>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:6,flexShrink:0}}>
+            <button onClick={ev=>{ev.stopPropagation();exportPDF(e);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #1D9E7540",background:"transparent",color:"#1D9E75",cursor:"pointer",fontSize:12}}>PDF</button>
+            <button onClick={ev=>{ev.stopPropagation();delE(e.id);}} style={{padding:"5px 10px",borderRadius:8,border:"0.5px solid #D85A3040",background:"transparent",color:"#D85A30",cursor:"pointer",fontSize:12}}>✕</button>
+          </div>
+        </div>
+      </div>))}
+    </Section>)}
+    <ConfirmDialog open={!!confirm} {...(confirm||{})} onCancel={()=>setConfirm(null)}/>
   </div>);
 }
 
-// ─── MANUALE ─────────────────────────────────────────────────────────────────
-function Manuale({onClose}){
-  const isMobile=useIsMobile();
-  const sections=[
-    {title:"1. Come avviare l'app",content:[
-      {type:"body",text:"L'app è contenuta in un singolo file <b>index.html</b>. Per usarla:"},
-      {type:"steps",items:["Apri <b>Visual Studio Code</b>","Installa l'estensione <b>Live Server</b> (se non già installata)","Apri la cartella contenente <b>index.html</b>","Tasto destro su index.html → <b>Open with Live Server</b>","Il browser si apre su <b>http://localhost:5500</b>"]},
-      {type:"warning",text:"⚠ Non aprire il file con doppio click — alcune funzionalità AI e prezzi live richiedono Live Server per funzionare correttamente."},
-    ]},
-    {title:"2. Impostazioni",content:[
-      {type:"h2",text:"API Key Google (Gemini)"},
-      {type:"body",text:"Inserisci la tua API key Google AI Studio nel campo dedicato. Necessaria per Analisi, Previsioni e Azioni. Ottienila su: <b>aistudio.google.com → Get API Key → Create API Key</b>"},
-      {type:"warning",text:"⚠ La key va reinserita ad ogni apertura del browser — non viene salvata per motivi di sicurezza."},
-      {type:"h2",text:"Aggiorna dati banche"},
-      {type:"body",text:"Quando ricevi nuovi estratti conto, carica un CSV nella sezione 'Aggiorna dati'. Colonne richieste: Nome; ISIN; Quantità; Prezzo_Carico; Prezzo_Attuale; Categoria."},
-      {type:"h2",text:"Prezzi live (benchmark)"},
-      {type:"body",text:"Clicca 'Carica prezzi live' per stimare il valore attuale del portafoglio. L'app applica la variazione % degli ETF benchmark ai controvalori del 29/04/2026."},
-      {type:"tip",text:"⚠ La stima è indicativa — non riflette il NAV reale dei tuoi fondi."},
-    ]},
-    {title:"3. Navigazione",content:[
-      {type:"body",text:"Su iPhone la navigazione avviene tramite la <b>tab bar in basso</b>. Su desktop i tab sono in alto a destra."},
-      {type:"table",headers:["Tab","Descrizione"],rows:[
-        ["Dashboard","Panoramica: valore totale, P&L, asset allocation, top 5 posizioni"],
-        ["Titoli","Lista completa con filtri per banca, categoria e ricerca"],
-        ["Analisi","Analisi AI con rischi, opportunità e raccomandazioni"],
-        ["Previsioni","Scenari AI per fine 2026 (ottimistico, base, pessimistico)"],
-        ["Azioni","Piano d'azione titolo per titolo generato da Gemini"],
-        ["Impostazioni","API key, aggiornamento dati, prezzi live, totali per banca"],
-      ]},
-    ]},
-    {title:"4. Analisi, Previsioni e Azioni AI",content:[
-      {type:"h2",text:"Filtro banca"},
-      {type:"body",text:"In cima a ciascuna tab AI trovi i pulsanti per selezionare quale banca analizzare: Tutto, Mediolanum, BPER Banca o Poste Italiane. La liquidità (C/C e libretti) viene sempre esclusa."},
-      {type:"h2",text:"Storico"},
-      {type:"body",text:"Ogni analisi/previsione/azione viene salvata automaticamente (max 5 per tab). Lo storico mostra data, ora e banca analizzata. Clicca su una voce per visualizzarla."},
-      {type:"h2",text:"Export PDF"},
-      {type:"steps",items:["Scorri fino allo Storico nella tab desiderata","Clicca il pulsante verde <b>PDF</b> accanto alla voce","Si apre la finestra di stampa del browser","Seleziona <b>'Salva come PDF'</b> e salva"]},
-      {type:"tip",text:"💡 Usa 'Rigenera' per aggiornare l'analisi quando cambiano le condizioni di mercato."},
-    ]},
-    {title:"5. Note importanti",content:[
-      {type:"warning",text:"📊 I dati sono aggiornati al 29/04/2026. Per aggiornare, carica un nuovo CSV dalla tab Impostazioni."},
-      {type:"warning",text:"💾 Lo storico è salvato nel browser locale. Non è accessibile da altri dispositivi. Se cancelli la cache del browser, lo storico verrà perso."},
-      {type:"tip",text:"🤖 Le analisi AI hanno scopo puramente informativo e non costituiscono consulenza finanziaria. Per decisioni di investimento, consulta sempre il tuo consulente."},
-    ]},
-  ];
-
-  const renderContent=items=>items.map((item,i)=>{
-    if(item.type==="body")return <p key={i} style={{fontSize:13,lineHeight:1.7,color:"#ccc",marginBottom:10}} dangerouslySetInnerHTML={{__html:item.text}}/>;
-    if(item.type==="h2")return <p key={i} style={{fontSize:13,fontWeight:700,color:"#378ADD",marginTop:12,marginBottom:6}}>{item.text}</p>;
-    if(item.type==="steps")return <ol key={i} style={{paddingLeft:20,marginBottom:10}}>{item.items.map((s,j)=><li key={j} style={{fontSize:13,color:"#ccc",lineHeight:1.7,marginBottom:4}} dangerouslySetInnerHTML={{__html:s}}/>)}</ol>;
-    if(item.type==="warning")return <div key={i} style={{background:"#EF9F2710",border:"0.5px solid #EF9F2740",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:12,color:"#EF9F27",lineHeight:1.6}}>{item.text}</div>;
-    if(item.type==="tip")return <div key={i} style={{background:"#1D9E7510",border:"0.5px solid #1D9E7540",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:12,color:"#1D9E75",lineHeight:1.6}}>{item.text}</div>;
-    if(item.type==="table")return(
-      <div key={i} style={{overflowX:"auto",marginBottom:10}}>
-        <table style={{width:"100%",fontSize:12,borderCollapse:"collapse"}}>
-          <thead><tr>{item.headers.map((h,j)=><th key={j} style={{textAlign:"left",padding:"7px 10px",background:"#2a2a3e",color:"#1D9E75",fontWeight:600,borderBottom:"1px solid #333"}}>{h}</th>)}</tr></thead>
-          <tbody>{item.rows.map((row,j)=><tr key={j} style={{borderBottom:"0.5px solid #2a2a3e"}}>{row.map((cell,k)=><td key={k} style={{padding:"8px 10px",color:k===0?"white":"#aaa",fontWeight:k===0?500:400,lineHeight:1.5}}>{cell}</td>)}</tr>)}</tbody>
-        </table>
-      </div>
-    );
-    return null;
-  });
-
-  return(
-    <div style={{position:"fixed",inset:0,background:"#000000cc",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#1a1a2e",borderRadius:"20px 20px 0 0",width:"100%",maxWidth:680,maxHeight:"92vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        {/* Header */}
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px 14px",borderBottom:"0.5px solid #2a2a3e",flexShrink:0}}>
-          <div>
-            <div style={{fontSize:18,fontWeight:700}}>Manuale d'uso</div>
-            <div style={{fontSize:12,color:"#888",marginTop:2}}>Portfolio Analyzer v2.0</div>
-          </div>
-          <button onClick={onClose} style={{width:32,height:32,borderRadius:"50%",border:"none",background:"#2a2a3e",color:"#888",cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
-        </div>
-        {/* Content scrollabile */}
-        <div style={{overflowY:"auto",padding:"16px 20px 32px",flex:1}}>
-          {sections.map((s,i)=>(
-            <div key={i} style={{marginBottom:24}}>
-              <div style={{fontSize:15,fontWeight:700,color:"#1D9E75",marginBottom:12,paddingBottom:8,borderBottom:"0.5px solid #2a2a3e"}}>{s.title}</div>
-              {renderContent(s.content)}
-            </div>
-          ))}
-          <div style={{fontSize:11,color:"#555",textAlign:"center",paddingTop:8}}>Portfolio Analyzer v2.0 · Sviluppato con Claude (Anthropic)</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── APP ROOT ─────────────────────────────────────────────────────────────────
+// ─── APP ROOT ────────────────────────────────────────────────────────────────
 function App(){
   const[bankData,setBankData]=useState({MD:MD_DATA,BPER:BPER_DATA,PI:PI_DATA});
   const[tab,setTab]=useState("dashboard");
@@ -919,10 +1681,14 @@ function App(){
   const[showKey,setShowKey]=useState(false);
   const[bankAI,setBankAI]=useState("all");
   const[showManual,setShowManual]=useState(false);
+  const[hasProblems,setHasProblems]=useState(false);
   const isMobile=useIsMobile();
 
   const all=Object.values(bankData).flat();
   const live=useLivePrices(all);
+
+  // Validation generale (per badge rosso e per passare alle tab AI)
+  const localValidation=useMemo(()=>validateHoldings(all),[bankData]);
 
   const aiAll=bankAI==="all"?all:all.filter(h=>h.banca===bankAI);
   const aiH=aiAll.filter(h=>!isLiq(h));
@@ -949,63 +1715,57 @@ function App(){
     {id:"analisi",icon:"◑",label:"Analisi"},
     {id:"previsioni",icon:"↗",label:"Previsioni"},
     {id:"azioni",icon:"⚡",label:"Azioni"},
-    {id:"impostazioni",icon:"⚙",label:"Impostazioni"},
+    {id:"impostazioni",icon:"⚙",label:"Impostazioni",badge:hasProblems},
   ];
 
   const AIFilter=()=>(
     <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-      {["all",...Object.keys(BANKS)].map(code=>{
-        const val=code==="all"?all.filter(h=>!isLiq(h)).reduce((s,h)=>s+(h.controvaloreAttuale||0),0):(bankData[code]||[]).filter(h=>!isLiq(h)).reduce((s,h)=>s+(h.controvaloreAttuale||0),0);
-        return(<button key={code} onClick={()=>setBankAI(code)} style={{padding:"7px 14px",borderRadius:20,fontSize:12,cursor:"pointer",border:bankAI===code?`1px solid ${code==="all"?"#888":BANKS[code]?.color}`:"0.5px solid #333",background:bankAI===code?(code==="all"?"#2a2a3e":`${BANKS[code]?.color}20`):"transparent",color:code==="all"?"white":BANKS[code]?.color??"white",fontWeight:bankAI===code?600:400}}>
-          {code==="all"?"Tutto":BANKS[code].name}
-        </button>);
-      })}
+      {["all",...Object.keys(BANKS)].map(code=>(<button key={code} onClick={()=>setBankAI(code)} style={{padding:"7px 14px",borderRadius:20,fontSize:12,cursor:"pointer",border:bankAI===code?`1px solid ${code==="all"?"#888":BANKS[code]?.color}`:"0.5px solid #333",background:bankAI===code?(code==="all"?"#2a2a3e":`${BANKS[code]?.color}20`):"transparent",color:code==="all"?"white":BANKS[code]?.color??"white",fontWeight:bankAI===code?600:400}}>{code==="all"?"Tutto":BANKS[code].name}</button>))}
     </div>
   );
 
   const LiqBox=()=>aiLiqTotal>0?(<div style={{background:"#1e2235",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-    <span style={{fontSize:13,color:"#888"}}>💰 Liquidità (esclusa)</span>
+    <span style={{fontSize:13,color:"#888"}}>💰 Liquidità (esclusa dall'AI)</span>
     <span style={{fontSize:14,fontWeight:600,color:"#A0A0B0"}}>{fmtEur(aiLiqTotal)}</span>
   </div>):null;
 
-  // Tab bar mobile (bottom) o top (desktop)
   const TabBar=()=>isMobile?(
     <div style={{position:"fixed",bottom:0,left:0,right:0,background:"#0e0e1a",borderTop:"0.5px solid #2a2a3e",display:"flex",zIndex:100,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
-      {TABS.map(t=>(
-        <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,padding:"8px 2px",background:"transparent",border:"none",color:tab===t.id?"#1D9E75":"#666",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-          <span style={{fontSize:16}}>{t.icon}</span>
-          <span style={{fontSize:9,fontWeight:tab===t.id?600:400}}>{t.label}</span>
-        </button>
-      ))}
+      {TABS.map(t=>(<button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,padding:"8px 2px",background:"transparent",border:"none",color:tab===t.id?"#1D9E75":"#666",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,position:"relative"}}>
+        <span style={{fontSize:16}}>{t.icon}</span>
+        <span style={{fontSize:9,fontWeight:tab===t.id?600:400}}>{t.label}</span>
+        {t.badge&&<div style={{position:"absolute",top:6,right:"30%",width:8,height:8,borderRadius:"50%",background:"#D85A30"}}/>}
+      </button>))}
     </div>
   ):(
     <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-      {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"7px 14px",borderRadius:8,border:"0.5px solid #444",background:tab===t.id?"#1e2235":"transparent",color:tab===t.id?"white":"#888",cursor:"pointer",fontSize:13,fontWeight:tab===t.id?500:400}}>{t.label}</button>)}
+      {TABS.map(t=>(<button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"7px 14px",borderRadius:8,border:"0.5px solid #444",background:tab===t.id?"#1e2235":"transparent",color:tab===t.id?"white":"#888",cursor:"pointer",fontSize:13,fontWeight:tab===t.id?500:400,position:"relative"}}>
+        {t.label}
+        {t.badge&&<span style={{display:"inline-block",marginLeft:6,width:6,height:6,borderRadius:"50%",background:"#D85A30"}}/>}
+      </button>))}
     </div>
   );
 
   return(<div style={{fontFamily:"system-ui,sans-serif",background:"#12121e",color:"white",minHeight:"100vh",maxWidth:"100vw",overflowX:"hidden"}}>
     <div style={{maxWidth:940,margin:"0 auto",padding:isMobile?"12px 12px 90px":"1.5rem"}}>
       {showManual&&<Manuale onClose={()=>setShowManual(false)}/>}
-      {/* Header */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.25rem",flexWrap:"wrap",gap:10}}>
         <div>
           <h1 style={{margin:0,fontSize:isMobile?20:22,fontWeight:700}}>Portfolio Analyzer</h1>
-          <div style={{fontSize:12,color:"#888"}}>Profilo bilanciato · {new Date().toLocaleDateString("it-IT")}</div>
+          <div style={{fontSize:12,color:"#888"}}>Profilo bilanciato · v{APP_VERSION}</div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           {!isMobile&&<TabBar/>}
-          <button onClick={()=>setShowManual(true)} style={{width:34,height:34,borderRadius:"50%",border:"0.5px solid #444",background:"#2a2a3e",color:"#aaa",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Manuale d'uso">?</button>
+          <button onClick={()=>setShowManual(true)} style={{width:34,height:34,borderRadius:"50%",border:"0.5px solid #444",background:"#2a2a3e",color:"#aaa",cursor:"pointer",fontSize:16,flexShrink:0}} title="Manuale">?</button>
         </div>
       </div>
 
-      {/* Content */}
       {tab==="dashboard"&&<DashboardTab all={all} totalValue={totalValue} totalPL={totalPL} totalPLpct={totalPLpct} byBank={byBank} catData={catData} live={live}/>}
-      {tab==="titoli"&&<TitoliTab filtered={filtered} sortCol={sortCol} sortDir={sortDir} handleSort={handleSort} fBank={fBank} setFBank={setFBank} fCat={fCat} setFCat={setFCat} search={search} setSearch={setSearch} categories={categories} live={live} totalValue={totalValue}/>}
-      {tab==="analisi"&&<><AIFilter/><LiqBox/><AnalisiTab holdings={aiH} totalValue={aiTotal} byCat={aiByCat} catData={aiCatData} bancaLabel={bankAI==="all"?"Tutto il portafoglio":BANKS[bankAI]?.name}/></>}
-      {tab==="previsioni"&&<><AIFilter/><LiqBox/><PrevisioniTab holdings={aiH} totalValue={aiTotal} bancaLabel={bankAI==="all"?"Tutto il portafoglio":BANKS[bankAI]?.name}/></>}
-      {tab==="azioni"&&<><AIFilter/><LiqBox/><AzioniTab holdings={aiH} totalValue={aiTotal} byCat={aiByCat} bancaLabel={bankAI==="all"?"Tutto il portafoglio":BANKS[bankAI]?.name}/></>}
-      {tab==="impostazioni"&&<ImpostazioniTab bankData={bankData} setBankData={setBankData} apiKey={apiKey} setApiKey={setApiKey} showKey={showKey} setShowKey={setShowKey} byBank={byBank} totalValue={totalValue} live={live}/>}
+      {tab==="titoli"&&<TitoliTab filtered={filtered} sortCol={sortCol} sortDir={sortDir} handleSort={handleSort} fBank={fBank} setFBank={setFBank} fCat={fCat} setFCat={setFCat} search={search} setSearch={setSearch} categories={categories} live={live}/>}
+      {tab==="analisi"&&<><AIFilter/><LiqBox/><AnalisiTab holdings={aiH} totalValue={aiTotal} byCat={aiByCat} catData={aiCatData} bancaLabel={bankAI==="all"?"Tutto il portafoglio":BANKS[bankAI]?.name} liveCheckLog={live.checkLog} localValidation={localValidation} apiKey={apiKey}/></>}
+      {tab==="previsioni"&&<><AIFilter/><LiqBox/><PrevisioniTab holdings={aiH} totalValue={aiTotal} bancaLabel={bankAI==="all"?"Tutto il portafoglio":BANKS[bankAI]?.name} liveCheckLog={live.checkLog} localValidation={localValidation} apiKey={apiKey}/></>}
+      {tab==="azioni"&&<><AIFilter/><LiqBox/><AzioniTab holdings={aiH} totalValue={aiTotal} byCat={aiByCat} bancaLabel={bankAI==="all"?"Tutto il portafoglio":BANKS[bankAI]?.name} liveCheckLog={live.checkLog} localValidation={localValidation} apiKey={apiKey}/></>}
+      {tab==="impostazioni"&&<ImpostazioniTab bankData={bankData} setBankData={setBankData} apiKey={apiKey} setApiKey={setApiKey} showKey={showKey} setShowKey={setShowKey} byBank={byBank} totalValue={totalValue} live={live} validation={localValidation} onProblems={setHasProblems}/>}
     </div>
     {isMobile&&<TabBar/>}
   </div>);
