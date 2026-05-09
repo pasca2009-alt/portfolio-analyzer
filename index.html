@@ -670,6 +670,45 @@ function Disclaimer(){
   </div>);
 }
 
+// ─── HOLDINGS LIST BOX — mostra l'elenco dei titoli oggetto dell'analisi AI ─
+function HoldingsListBox({holdings,totalValue}){
+  const[open,setOpen]=useState(false);
+  const sorted=[...holdings].sort((a,b)=>(b.controvaloreAttuale||0)-(a.controvaloreAttuale||0));
+  return(<div style={{background:"#1e2235",border:"0.5px solid #2a2a3e",borderRadius:10,marginBottom:12,overflow:"hidden"}}>
+    <div onClick={()=>setOpen(o=>!o)} style={{padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",userSelect:"none"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <span style={{fontSize:13,fontWeight:600,color:"#7F77DD"}}>📋 Titoli oggetto dell'analisi</span>
+        <span style={{fontSize:11,color:"#888"}}>({holdings.length} titoli · {fmtEur(totalValue)})</span>
+      </div>
+      <span style={{fontSize:11,color:"#888"}}>{open?"▲ Nascondi":"▼ Mostra"}</span>
+    </div>
+    {open&&<div style={{padding:"0 14px 12px",borderTop:"0.5px solid #2a2a3e"}}>
+      <div style={{paddingTop:10,maxHeight:300,overflowY:"auto"}}>
+        {sorted.map((h,i)=>{
+          const peso=totalValue>0?(h.controvaloreAttuale/totalValue*100):0;
+          const ri=getRendInfo(h);
+          return(<div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:i<sorted.length-1?"0.5px solid #2a2a3e":"none",fontSize:12}}>
+            <div style={{flex:1,marginRight:8,overflow:"hidden"}}>
+              <div style={{fontSize:12,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.nome}</div>
+              <div style={{fontSize:10,color:"#888",marginTop:2}}>
+                <span style={{padding:"1px 5px",borderRadius:3,background:`${BANKS[h.banca]?.color}25`,color:BANKS[h.banca]?.color,fontWeight:600}}>{h.banca}</span>
+                <span style={{marginLeft:6}}>{h.categoria}</span>
+              </div>
+            </div>
+            <div style={{textAlign:"right",flexShrink:0}}>
+              <div style={{fontSize:12,fontWeight:600}}>{fmtEur(h.controvaloreAttuale)}</div>
+              <div style={{fontSize:10,color:"#888"}}>
+                {peso.toFixed(1)}%
+                {ri.tipo!=="none"&&<span style={{marginLeft:6,color:ri.valore>=0?"#1D9E75":"#D85A30"}}>{fmtPct(ri.valore)}<span style={{color:"#666",marginLeft:2}}>{ri.tipo==="annuo"?"ann":"tot"}</span></span>}
+              </div>
+            </div>
+          </div>);
+        })}
+      </div>
+    </div>}
+  </div>);
+}
+
 // ─── BADGE AFFIDABILITÀ ──────────────────────────────────────────────────────
 function ReliabilityBadge({level}){
   const cfg={
@@ -1284,7 +1323,7 @@ function AnalisiTab({holdings,totalValue,byCat,catData,bancaLabel,liveCheckLog,l
   const dataChanged=viewIdx!==null&&storico[viewIdx]?.hash&&storico[viewIdx].hash!==dataHash(holdings.map(h=>({n:h.nome,c:h.controvaloreAttuale,p:h.plusMinus,r:h.rendimentoAnnuo,rt:h.rendimentoTotale})));
 
   return(<div>
-    <Disclaimer/>
+    <Disclaimer/><HoldingsListBox holdings={holdings} totalValue={totalValue}/>
     <Section>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:display||error?16:0}}>
         <div><div style={{fontWeight:600,fontSize:15}}>Analisi AI</div><div style={{fontSize:11,color:"#888"}}>Validazione + Gemini</div></div>
@@ -1445,7 +1484,7 @@ function PrevisioniTab({holdings,totalValue,bancaLabel,liveCheckLog,localValidat
   const dataChanged=viewIdx!==null&&storico[viewIdx]?.hash&&storico[viewIdx].hash!==dataHash(holdings.map(h=>({n:h.nome,c:h.controvaloreAttuale,p:h.plusMinus,r:h.rendimentoAnnuo,rt:h.rendimentoTotale})));
 
   return(<div>
-    <Disclaimer/>
+    <Disclaimer/><HoldingsListBox holdings={holdings} totalValue={totalValue}/>
     <Section>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div><div style={{fontWeight:600,fontSize:15}}>Scenari AI</div><div style={{fontSize:11,color:"#888"}}>Validazione + Gemini</div></div>
@@ -1515,6 +1554,42 @@ function PrevisioniTab({holdings,totalValue,bancaLabel,liveCheckLog,localValidat
         </div>
       </div>))}
     </Section>)}
+    {scenarios&&!scenarios.error&&holdings.length>0&&(
+      <Section title="📊 Stima per titolo (rendimento storico)">
+        <div style={{fontSize:11,color:"#888",marginBottom:10,fontStyle:"italic"}}>Proiezione semplice basata sul rendimento storico di ogni titolo. Non considera scenari di mercato.</div>
+        {[...holdings].filter(h=>h.controvaloreAttuale>0).sort((a,b)=>(b.controvaloreAttuale||0)-(a.controvaloreAttuale||0)).map((h,i,arr)=>{
+          const r=getRend(h);
+          const v6=h.controvaloreAttuale*Math.pow(1+r/100/12,6);
+          const v12=h.controvaloreAttuale*Math.pow(1+r/100/12,12);
+          const ri=getRendInfo(h);
+          return(<div key={i} style={{padding:"10px 0",borderBottom:i<arr.length-1?"0.5px solid #2a2a3e":"none"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+              <div style={{flex:1,marginRight:12,overflow:"hidden"}}>
+                <div style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.nome}</div>
+                <div style={{fontSize:11,color:"#888",marginTop:2}}>
+                  <span style={{padding:"1px 5px",borderRadius:3,background:`${BANKS[h.banca]?.color}25`,color:BANKS[h.banca]?.color,fontWeight:600}}>{h.banca}</span>
+                  <span style={{marginLeft:6}}>{h.categoria}</span>
+                  {ri.tipo!=="none"&&<span style={{marginLeft:6,color:r>=0?"#1D9E75":"#D85A30"}}>· rend.{ri.tipo==="annuo"?"ann":"tot"} {fmtPct(r)}</span>}
+                </div>
+              </div>
+              <div style={{fontSize:14,fontWeight:600,flexShrink:0}}>{fmtEur(h.controvaloreAttuale)}</div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <div style={{flex:1,background:"#12121e",borderRadius:8,padding:"8px 10px"}}>
+                <div style={{fontSize:10,color:"#888"}}>+6 mesi</div>
+                <div style={{fontSize:13,fontWeight:600,color:v6>=h.controvaloreAttuale?"#1D9E75":"#D85A30"}}>{fmtEur(v6)}</div>
+                <div style={{fontSize:10,color:"#666"}}>{v6>=h.controvaloreAttuale?"+":""}{fmtEur(v6-h.controvaloreAttuale)}</div>
+              </div>
+              <div style={{flex:1,background:"#12121e",borderRadius:8,padding:"8px 10px"}}>
+                <div style={{fontSize:10,color:"#888"}}>+12 mesi</div>
+                <div style={{fontSize:13,fontWeight:600,color:v12>=h.controvaloreAttuale?"#1D9E75":"#D85A30"}}>{fmtEur(v12)}</div>
+                <div style={{fontSize:10,color:"#666"}}>{v12>=h.controvaloreAttuale?"+":""}{fmtEur(v12-h.controvaloreAttuale)}</div>
+              </div>
+            </div>
+          </div>);
+        })}
+      </Section>
+    )}
     <ConfirmDialog open={!!confirm} {...(confirm||{})} onCancel={()=>setConfirm(null)}/>
   </div>);
 }
@@ -1629,7 +1704,7 @@ function AzioniTab({holdings,totalValue,byCat,bancaLabel,liveCheckLog,localValid
   const cnt=displayJson?.titoli?Object.keys(AZIONE_META).reduce((a,k)=>{a[k]=displayJson.titoli.filter(t=>t.azione===k).length;return a;},{}):{}; 
 
   return(<div>
-    <Disclaimer/>
+    <Disclaimer/><HoldingsListBox holdings={holdings} totalValue={totalValue}/>
     <Section>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div><div style={{fontWeight:600,fontSize:15}}>Piano d'Azione AI</div><div style={{fontSize:11,color:"#888"}}>Validazione + Gemini</div></div>
